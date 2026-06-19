@@ -314,7 +314,7 @@ function Lobby({ game, players, pattern, share }) {
       <div className="code-card">
         <div className="dim tiny">Game code</div>
         <div className="code-big">{game?.code}</div>
-        <button className="btn" onClick={share}>Invite friends</button>
+        <button className="btn btn-brand" onClick={share}>Invite friends</button>
       </div>
       <div style={{ height: 16 }} />
       <div className="dim tiny" style={{ marginBottom: 8 }}>Win pattern: {prettyPattern(pattern)} · {players.length} in the room</div>
