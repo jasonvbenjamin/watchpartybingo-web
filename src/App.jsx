@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ensureSession, joinGame, fetchGame, fetchPlayerStates,
-  markSquare, claimBingo, subscribeGame, recordSnap, recordRepeat,
+  markSquare, claimBingo, subscribeGame, recordSnap, recordRepeat, uploadSnap,
 } from './lib/supabase'
 import { buildCard, hasBingo, squaresAway, FREE_INDEX } from './lib/bingo'
 import { themeVars } from './lib/theme'
@@ -28,6 +28,9 @@ export default function App() {
   const [pts, setPts] = useState({ total: 0, dabs: 0, snaps: 0, repeats: 0 })
 
   const [sheet, setSheet] = useState(null)            // tapped cell index
+  const [snaps, setSnaps] = useState([])              // local My Snaps gallery
+  const fileRef = useRef(null)
+  const pendingSnap = useRef(null)
   const [statsOpen, setStatsOpen] = useState(false)
   const [won, setWon] = useState(false)
   const [playersOpen, setPlayersOpen] = useState(false)
@@ -134,6 +137,25 @@ export default function App() {
     setTimeout(() => setPulses((p) => p.filter((x) => x.id !== id)), 3200)
   }
 
+  // Snap = capture a photo, then mark + score (+3). Preview has no camera.
+  function startSnap(i) {
+    setSheet(null)
+    if (game?.preview) { interact(i, 'snap'); return }
+    pendingSnap.current = { index: i, trope: tropes[card[i]]?.text }
+    fileRef.current?.click()
+  }
+  function onSnapFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    const pend = pendingSnap.current
+    pendingSnap.current = null
+    if (!file || !pend) return
+    const url = URL.createObjectURL(file)
+    setSnaps((s) => [{ id: url, url, trope: pend.trope }, ...s])
+    interact(pend.index, 'snap')   // mark + record_snap (+3) + pulse
+    uploadSnap(game.id, uid, file, { squareIndex: pend.index, tropeText: pend.trope, name }).catch(() => {})
+  }
+
   // ---- NAME / JOIN GATE ----
   if (phase === 'name') {
     return (
@@ -209,14 +231,17 @@ export default function App() {
         </div>
       )}
 
+      <input ref={fileRef} type="file" accept="image/*" capture="environment"
+        style={{ display: 'none' }} onChange={onSnapFile} />
+
       {sheet != null && (
         <TileSheet trope={tropes[card[sheet]]} marked={marked.has(sheet)}
           onClose={() => setSheet(null)}
-          onDab={() => interact(sheet, 'dab')} onSnap={() => interact(sheet, 'snap')} />
+          onDab={() => interact(sheet, 'dab')} onSnap={() => startSnap(sheet)} />
       )}
 
       {statsOpen && (
-        <StatsSheet pts={pts} away={myAway} marked={marked} me={me} liveOn={liveOn}
+        <StatsSheet pts={pts} away={myAway} marked={marked} me={me} snaps={snaps} liveOn={liveOn}
           onToggleLive={() => setLiveOn((v) => !v)} onClose={() => setStatsOpen(false)} />
       )}
 
@@ -326,7 +351,7 @@ function TileSheet({ trope, marked, onClose, onDab, onSnap }) {
   )
 }
 
-function StatsSheet({ pts, away, marked, me, liveOn, onToggleLive, onClose }) {
+function StatsSheet({ pts, away, marked, me, snaps = [], liveOn, onToggleLive, onClose }) {
   const contentMarked = [...marked].filter((x) => x !== FREE_INDEX).length
   const total = me?.score ?? pts.total
   const snapped = me?.photos_taken ?? pts.snaps
@@ -348,7 +373,17 @@ function StatsSheet({ pts, away, marked, me, liveOn, onToggleLive, onClose }) {
             <div className="dim tiny">See when others mark squares</div></div>
           <div className={`switch${liveOn ? ' on' : ''}`}><span /></div>
         </button>
-        <p className="dim tiny" style={{ marginTop: 14 }}>Points are local for now — cross-player leaderboard &amp; photo snaps land with the points backend.</p>
+        <div className="snaps-head">📸 My Snaps ({snaps.length})</div>
+        {snaps.length === 0
+          ? <div className="snaps-empty">No snaps yet — tap a square → Snap It for +3.</div>
+          : <div className="snaps-grid">
+              {snaps.map((s) => (
+                <div className="snap-thumb" key={s.id}>
+                  <img src={s.url} alt={s.trope || 'snap'} />
+                  {s.trope && <span>{s.trope}</span>}
+                </div>
+              ))}
+            </div>}
       </div>
     </div>
   )

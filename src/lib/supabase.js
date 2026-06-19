@@ -80,6 +80,19 @@ export async function recordRepeat(gameId) {
   return data
 }
 
+/** Upload a Snap photo to the private members-only bucket + record metadata.
+ *  Scoring (+3) is handled by record_snap via the interaction flow, not here. */
+export async function uploadSnap(gameId, userId, file, { squareIndex, tropeText, name }) {
+  const ext = (file.type?.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
+  const path = `${gameId}/${userId}/${crypto.randomUUID()}.${ext}`
+  const up = await supabase.storage.from('snaps').upload(path, file, { contentType: file.type || 'image/jpeg' })
+  if (up.error) throw up.error
+  await supabase.from('snaps').insert({
+    game_id: gameId, user_id: userId, name, square_index: squareIndex, trope_text: tropeText, path,
+  })
+  return path
+}
+
 export async function leaveGame(gameId) {
   await supabase.rpc('leave_game', { p_game_id: gameId }).catch(() => {})
 }
