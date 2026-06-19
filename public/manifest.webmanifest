@@ -1,0 +1,14 @@
+{
+  "name": "Watch Party Bingo",
+  "short_name": "Bingo",
+  "description": "Play bingo with your friends during the game.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
