@@ -496,7 +496,7 @@ function Landing({ onJoin }) {
           <a className="lp-link" href="?preview=1">Peek at a live board →</a>
         </section>
 
-        <GenreCarousel />
+        <TropeWall />
 
         <section className="lp-how">
           <h2 className="display">How it works</h2>
@@ -549,71 +549,61 @@ function BetaSignup() {
   )
 }
 
-// Fun genre cards for the landing showcase — the humor IS the pitch.
-const GENRE_CARDS = [
-  { name: 'Rom-Com', emoji: '💘', tint: '#FF5FA2', tropes: [
-    ['🛫', 'Airport dash'], ['🌧️', 'Rain kiss'], ['😤', 'Hate → love'],
-    ['🙅', 'Wrong guy first'], ['🤦', 'Big misunderstanding'], ['💄', 'Makeover reveal'] ] },
-  { name: 'Reality TV', emoji: '📺', tint: '#7D3BFF', tropes: [
-    ['😈', "Not here to make friends"], ['🎙️', "Producer's voice"], ['😭', 'Dramatic confessional'],
-    ['🍷', 'Drink gets thrown'], ['🎬', 'Villain edit'], ['⏭️', 'To be continued…'] ] },
-  { name: 'NBA', emoji: '🏀', tint: '#F0820F', tropes: [
-    ['👴', 'Back in my day'], ['😱', 'Flagrant review'], ['👔', 'Coach loses it'],
-    ['🗣️', 'And-one yell'], ['✈️', 'Poster dunk'], ['📣', 'Ref gets booed'] ] },
-  { name: 'Horror', emoji: '🔪', tint: '#34C759', tropes: [
-    ['🚪', "Don't go in there"], ['👻', "It's behind you"], ['🚗', "Car won't start"],
-    ['👥', 'Splits the group'], ['🔪', "Killer's not dead"], ['📵', 'No signal'] ] },
-  { name: 'Holiday Movies', emoji: '🎄', tint: '#E23B5A', tropes: [
-    ['🏙️', 'Quits the big city'], ['❄️', 'Snow on cue'], ['🎄', 'Tree lighting'],
-    ['🤴', 'Secret prince'], ['🍪', 'Bake-off save'], ['😬', 'Almost-kiss'] ] },
-  { name: 'Cooking Shows', emoji: '👨‍🍳', tint: '#FFB000', tropes: [
-    ['🥩', 'Raw in the middle'], ['🚪', 'Walks out'], ['🍡', '"Deconstructed…"'],
-    ['⏸️', "Judge's dramatic pause"], ['⏰', 'Out of time'], ['😢', 'Crying backstory'] ] },
-  { name: 'Award Shows', emoji: '🏆', tint: '#B43BFF', tropes: [
-    ['🎵', 'Played off stage'], ['👯', 'Surprise reunion'], ['✊', 'Political speech'],
-    ['📷', 'Camera on the loser'], ['👗', 'Wardrobe slip'], ['🕯️', 'In Memoriam tears'] ] },
+// The tropes ARE the pitch — evocative phrasing that makes people remember their
+// own TV moments. A flowing wall, mixed across genres; tap to "dab" like the game.
+const TROPES = [
+  ['🌧️', 'The rain kiss'],
+  ['🛫', 'Airport dash to stop them leaving'],
+  ['😤', 'Enemies, then lovers'],
+  ['📺', '"I\'m not here to make friends"'],
+  ['😭', 'Crying in the confessional'],
+  ['🍷', 'A drink gets thrown'],
+  ['🏀', '"Back in my day…"'],
+  ['👔', 'Coach loses it at the ref'],
+  ['✈️', "Dunk on somebody's whole career"],
+  ['🔪', "The killer isn't actually dead"],
+  ['📵', '"There\'s no signal!"'],
+  ['🎄', 'Quits the big city for love'],
+  ['❄️', 'It snows right on cue'],
+  ['🤴', 'He was secretly a prince'],
+  ['👨‍🍳', '"It\'s a deconstructed…"'],
+  ['⏰', 'Out of time with raw chicken'],
+  ['🏆', 'Played off stage mid-speech'],
+  ['👗', 'The wardrobe malfunction'],
+  ['😬', 'The almost-kiss interruption'],
+  ['🕯️', 'Crying during In Memoriam'],
+  ['🚗', "The car won't start"],
+  ['💍', 'The reunion proposal'],
 ]
 
-function GenreCarousel() {
-  const ref = useRef(null)
-  const idx = useRef(0)
-  useEffect(() => {
-    const el = ref.current
-    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    let stopped = false
-    const stop = () => { stopped = true }
-    el.addEventListener('pointerdown', stop, { once: true })   // yield to the user
-    const id = setInterval(() => {
-      const node = ref.current
-      if (stopped || !node) return
-      idx.current = (idx.current + 1) % node.children.length
-      const card = node.children[idx.current]
-      if (!card) return
-      const delta = card.getBoundingClientRect().left - node.getBoundingClientRect().left
-        - (node.clientWidth - card.clientWidth) / 2
-      node.scrollBy({ left: delta, behavior: 'smooth' })
-    }, 3800)
-    return () => { clearInterval(id); el.removeEventListener('pointerdown', stop) }
-  }, [])
+function TropeWall() {
+  const [dabbed, setDabbed] = useState(() => new Set())
+  function toggle(i) {
+    buzz(14)
+    setDabbed((prev) => {
+      const next = new Set(prev)
+      next.has(i) ? next.delete(i) : next.add(i)
+      return next
+    })
+  }
+  const n = dabbed.size
   return (
-    <section className="lp-genres">
-      <h2 className="display">Spot these live</h2>
-      <div className="genre-row" ref={ref}>
-        {GENRE_CARDS.map((g) => (
-          <article className="genre-card" key={g.name} style={{ '--tint': g.tint }}>
-            <div className="genre-head">
-              <span className="genre-emoji">{g.emoji}</span>
-              <span className="genre-name display">{g.name}</span>
-            </div>
-            <div className="genre-tiles">
-              {g.tropes.map(([e, t]) => (
-                <div className="genre-tile" key={t}><span className="ge">{e}</span><span className="gt">{t}</span></div>
-              ))}
-            </div>
-          </article>
+    <section className="lp-wall">
+      <h2 className="display">You've seen these. Admit it.</h2>
+      <p className="dim">Tap every one you've witnessed →</p>
+      <div className="wall">
+        {TROPES.map(([e, t], i) => (
+          <button key={t} className={`chip${dabbed.has(i) ? ' dabbed' : ''}`} onClick={() => toggle(i)}>
+            <span className="chip-e">{e}</span>{t}
+          </button>
         ))}
       </div>
-      <div className="genre-hint dim">swipe through the chaos →</div>
+      <div className="wall-count">
+        {n === 0 ? ' '
+          : n < 5 ? `${n} witnessed — keep going 👀`
+          : n < 10 ? `${n} witnessed — you watch way too much TV (respect) 📺`
+          : `${n} witnessed — you'd dominate. Grab a code from a friend ↑`}
+      </div>
     </section>
   )
 }

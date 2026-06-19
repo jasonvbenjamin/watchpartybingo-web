@@ -215,29 +215,18 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 
 .lp-foot { text-align: center; color: var(--text-tertiary); padding: 18px 0 4px; font-size: 16px; }
 
-/* Genre carousel — the fun showcase */
-.lp-genres { margin: 0 -16px 24px; }
-.lp-genres h2 { font-size: 20px; margin: 0 16px 12px; }
-.genre-row { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory;
-  padding: 6px 16px 10px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-.genre-row::-webkit-scrollbar { display: none; }
-.genre-card { flex: 0 0 80%; max-width: 290px; scroll-snap-align: center; position: relative; overflow: hidden;
-  border-radius: 20px; padding: 16px; background: var(--surface); border: 1px solid var(--hairline);
-  box-shadow: 0 22px 48px -26px var(--tint); }
-.genre-card::before { content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(130% 80% at 50% -12%, var(--tint), transparent 62%);
-  opacity: 0.22; animation: tintBreathe 4.5s ease-in-out infinite; }
-@keyframes tintBreathe { 0%, 100% { opacity: 0.16; } 50% { opacity: 0.30; } }
-.genre-head { position: relative; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-.genre-emoji { font-size: 28px; }
-.genre-name { font-size: 19px; }
-.genre-tiles { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.genre-tile { background: rgba(255,255,255,0.95); color: #14141c; border-radius: 12px; padding: 9px 8px;
-  display: flex; flex-direction: column; gap: 4px; min-height: 60px; }
-.genre-tile .ge { font-size: 17px; line-height: 1; }
-.genre-tile .gt { font-size: 11px; font-weight: 800; line-height: 1.15; }
-.genre-hint { text-align: center; font-size: 13px; margin-top: 6px; }
+/* "You've seen these" trope wall — the tropes are the hero, no forced motion */
+.lp-wall { margin-bottom: 26px; }
+.lp-wall h2 { font-size: 23px; line-height: 1.1; margin: 0 0 4px; }
+.lp-wall > p { margin: 0 0 16px; }
+.wall { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 11px 15px; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--hairline); color: var(--text);
+  font-size: 15px; font-weight: 700; line-height: 1.15; cursor: pointer; transition: transform .12s ease; }
+.chip .chip-e { font-size: 17px; }
+.chip:active { transform: scale(0.96); }
+.chip.dabbed { background: var(--gradient); border-color: transparent; color: #fff; animation: chipPop .28s ease; }
+@keyframes chipPop { 0% { transform: scale(0.9); } 55% { transform: scale(1.07); } 100% { transform: scale(1); } }
+.wall-count { margin-top: 18px; min-height: 22px; font-weight: 800; font-size: 15px; color: var(--accent-2); }
 
-@media (prefers-reduced-motion: reduce) {
-  .genre-card::before { animation: none !important; }
-}
+@media (prefers-reduced-motion: reduce) { .chip.dabbed { animation: none !important; } }
