@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ensureSession, joinGame, fetchGame, fetchPlayerStates,
-  markSquare, claimBingo, subscribeGame, recordSnap, recordRepeat, uploadSnap,
+  markSquare, claimBingo, subscribeGame, recordSnap, recordRepeat, uploadSnap, joinWaitlist,
 } from './lib/supabase'
 import { buildCard, hasBingo, squaresAway, FREE_INDEX } from './lib/bingo'
 import { themeVars } from './lib/theme'
@@ -14,7 +14,7 @@ export default function App() {
     || decodeURIComponent(location.pathname.split('/join/')[1] || '')
   ).toUpperCase(), [])
 
-  const [phase, setPhase] = useState('name')          // name | live
+  const [phase, setPhase] = useState(urlCode ? 'name' : 'landing')  // landing | name | live
   const [code, setCode] = useState(urlCode)
   const [name, setName] = useState(localStorage.getItem(NAME_KEY) || '')
   const [busy, setBusy] = useState(false)
@@ -154,6 +154,11 @@ export default function App() {
     setSnaps((s) => [{ id: url, url, trope: pend.trope }, ...s])
     interact(pend.index, 'snap')   // mark + record_snap (+3) + pulse
     uploadSnap(game.id, uid, file, { squareIndex: pend.index, tropeText: pend.trope, name }).catch(() => {})
+  }
+
+  // ---- LANDING (marketing front door) ----
+  if (phase === 'landing') {
+    return <Landing onJoin={(c) => { setCode(c); setPhase('name') }} />
   }
 
   // ---- NAME / JOIN GATE ----
@@ -464,4 +469,80 @@ function chime() {
       o.start(t); o.stop(t + 0.42)
     })
   } catch { /* ignore */ }
+}
+
+// ---- Marketing landing page (the front door) ----
+function Landing({ onJoin }) {
+  const [code, setCode] = useState('')
+  return (
+    <div className="screen landing">
+      <div className="wrap lp">
+        <header className="lp-hero">
+          <div className="lp-wordmark">
+            <span className="w">Watch</span>
+            <span className="p">Party</span>
+            <span className="b">Bingo!</span>
+          </div>
+          <p className="lp-tag">Live bingo for your watch parties. Spot the tropes as they happen, snap the moments, and race your friends to a bingo.</p>
+        </header>
+
+        <section className="lp-card">
+          <div className="lp-card-title">Got a game code?</div>
+          <form onSubmit={(e) => { e.preventDefault(); if (code.trim()) onJoin(code.trim().toUpperCase()) }}>
+            <input className="field code-field" placeholder="CODE" value={code} maxLength={12}
+              autoCapitalize="characters" onChange={(e) => setCode(e.target.value.toUpperCase())} />
+            <button className="btn" type="submit" disabled={!code.trim()} style={{ marginTop: 10 }}>Join the game</button>
+          </form>
+          <a className="lp-link" href="?preview=1">Peek at a live board →</a>
+        </section>
+
+        <section className="lp-how">
+          <h2 className="display">How it works</h2>
+          <div className="lp-steps">
+            {[
+              ['🎬', 'Pick a theme', 'NBA, reality TV, holiday movies & more.'],
+              ['🔗', 'Share a link', 'Friends tap and play — no app required.'],
+              ['📸', 'Spot & snap', 'Dab a trope for a point, snap a photo for three.'],
+              ['🏆', 'Race to bingo', 'Live leaderboard — first to the pattern wins.'],
+            ].map(([e, t, d]) => (
+              <div className="lp-step" key={t}>
+                <div className="lp-emoji">{e}</div>
+                <div><div className="lp-step-t">{t}</div><div className="lp-step-d">{d}</div></div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <BetaSignup />
+        <footer className="lp-foot display">WatchPartyBingo</footer>
+      </div>
+    </div>
+  )
+}
+
+function BetaSignup() {
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
+  async function submit(e) {
+    e.preventDefault()
+    if (!email.trim()) return
+    setBusy(true)
+    try { await joinWaitlist(email.trim()); setDone(true) } catch { /* keep form for retry */ } finally { setBusy(false) }
+  }
+  return (
+    <section className="lp-card lp-beta">
+      <div className="lp-card-title">Want to host your own?</div>
+      <p className="dim" style={{ margin: '4px 0 14px' }}>The iOS app — pick a theme, create a game, AI-made cards — is in beta. Get notified when it lands.</p>
+      {done
+        ? <div className="lp-done">🎉 You're on the list — we'll be in touch.</div>
+        : <form onSubmit={submit}>
+            <input className="field" type="email" inputMode="email" placeholder="you@email.com"
+              value={email} onChange={(e) => setEmail(e.target.value)} />
+            <button className="btn btn-brand" type="submit" disabled={busy || !email.trim()} style={{ marginTop: 10 }}>
+              {busy ? 'Joining…' : 'Join the beta'}
+            </button>
+          </form>}
+    </section>
+  )
 }

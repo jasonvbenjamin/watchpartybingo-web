@@ -27,6 +27,12 @@ export async function ensureSession() {
   return user?.id ?? null
 }
 
+/** Marketing landing-page beta capture (write-only `waitlist` table). */
+export async function joinWaitlist(email) {
+  const { error } = await supabase.from('waitlist').insert({ email, source: 'web-landing' })
+  if (error) throw error
+}
+
 /** Join by code. Pass an empty card — like iOS, each client generates its own
  *  card locally (wins are positional, validated server-side). Returns the
  *  player_states row (carries game_id). */

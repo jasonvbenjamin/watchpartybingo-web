@@ -184,3 +184,33 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 @media (prefers-reduced-motion: reduce) {
   .cell.marked, .confetti span, .sheet, .oneaway, .pulse-toast { animation: none !important; }
 }
+
+/* ---- Marketing landing page ---- */
+.display { font-family: 'Dela Gothic One', system-ui, -apple-system, sans-serif; }
+.landing .wrap.lp { padding-top: 30px; }
+.lp section, .lp header { margin-bottom: 22px; }
+.lp-hero { margin-bottom: 28px; }
+.lp-wordmark { display: flex; flex-direction: column; line-height: 0.92; letter-spacing: -0.01em;
+  font-family: 'Dela Gothic One', system-ui, sans-serif; font-size: clamp(46px, 15vw, 76px); margin-bottom: 16px; }
+.lp-wordmark .w { color: #fff; }
+.lp-wordmark .p { color: var(--accent); }
+.lp-wordmark .b { color: var(--accent-2); }
+.lp-tag { color: var(--text-dim); font-size: 17px; line-height: 1.5; max-width: 32ch; margin: 0; }
+
+.lp-card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 18px; padding: 20px; }
+.lp-card-title { font-weight: 800; font-size: 18px; margin-bottom: 12px; }
+.lp-link { display: inline-block; margin-top: 12px; color: var(--accent); font-weight: 700; font-size: 14px; text-decoration: none; }
+
+.lp-how h2 { font-size: 20px; margin: 0 0 14px; }
+.lp-steps { display: flex; flex-direction: column; gap: 12px; }
+.lp-step { display: flex; gap: 14px; align-items: flex-start; }
+.lp-emoji { font-size: 24px; width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px; }
+.lp-step-t { font-weight: 800; }
+.lp-step-d { color: var(--text-dim); font-size: 14px; line-height: 1.35; }
+
+.lp-beta { background: var(--surface-2); }
+.lp-done { padding: 14px; border-radius: 12px; background: rgba(52,199,89,0.12);
+  border: 1px solid rgba(52,199,89,0.3); color: #7ee2a0; font-weight: 700; text-align: center; }
+
+.lp-foot { text-align: center; color: var(--text-tertiary); padding: 18px 0 4px; font-size: 16px; }
