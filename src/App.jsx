@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ensureSession, joinGame, fetchGame, fetchPlayerStates,
-  markSquare, claimBingo, subscribeGame,
+  markSquare, claimBingo, subscribeGame, recordSnap, recordRepeat,
 } from './lib/supabase'
 import { buildCard, hasBingo, squaresAway, FREE_INDEX } from './lib/bingo'
 import { themeVars } from './lib/theme'
@@ -57,6 +57,7 @@ export default function App() {
   const myAway = squaresAway(marked, pattern)
   const iWon = winners.some((w) => (w.user_id || '').toLowerCase() === (uid || '').toLowerCase())
   const oneAway = playing && !iWon && !won && myAway === 1
+  const me = players.find((p) => (p.user_id || '').toLowerCase() === (uid || '').toLowerCase())
   liveOnRef.current = liveOn
   useEffect(() => { if (oneAway) buzz(25) }, [oneAway])
 
@@ -106,6 +107,10 @@ export default function App() {
       if (!already) { next.add(i); persistMark(next) }
       return next
     })
+    if (!game?.preview) {
+      if (kind === 'snap') recordSnap(game.id).catch(() => {})
+      else if (already) recordRepeat(game.id).catch(() => {})
+    }
     setPts((p) => kind === 'snap'
       ? { ...p, total: p.total + 3, snaps: p.snaps + 1, repeats: p.repeats + (already ? 1 : 0) }
       : { ...p, total: p.total + 1, dabs: p.dabs + 1, repeats: p.repeats + (already ? 1 : 0) })
@@ -211,7 +216,7 @@ export default function App() {
       )}
 
       {statsOpen && (
-        <StatsSheet pts={pts} away={myAway} marked={marked} liveOn={liveOn}
+        <StatsSheet pts={pts} away={myAway} marked={marked} me={me} liveOn={liveOn}
           onToggleLive={() => setLiveOn((v) => !v)} onClose={() => setStatsOpen(false)} />
       )}
 
@@ -229,20 +234,21 @@ function PlayersSheet({ players, pattern, uid, myMarked, hostId, winners, onClos
   const key = (s) => (s || '').toLowerCase()
   const winRank = (id) => winners.findIndex((w) => key(w.user_id) === key(id))
   const awayOf = (p) => squaresAway(key(p.user_id) === key(uid) ? [...myMarked] : (p.marked || []), pattern)
-  const rows = players.map((p) => ({ p, away: awayOf(p), win: winRank(p.user_id) }))
+  const rows = players.map((p) => ({ p, away: awayOf(p), win: winRank(p.user_id), score: p.score ?? 0 }))
     .sort((a, b) => {
       if ((a.win >= 0) !== (b.win >= 0)) return a.win >= 0 ? -1 : 1
       if (a.win >= 0 && b.win >= 0) return a.win - b.win
+      if (b.score !== a.score) return b.score - a.score
       return a.away - b.away
     })
   return (
     <div className="sheet-scrim" onClick={onClose}>
       <div className="sheet sheet-dark" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
         <button className="close" onClick={onClose}>✕</button>
-        <h2>Players ({players.length})</h2>
-        <div className="dim tiny" style={{ marginBottom: 12 }}>Closest to bingo first</div>
+        <h2>Leaderboard ({players.length})</h2>
+        <div className="dim tiny" style={{ marginBottom: 12 }}>Most points first · closeness as tiebreak</div>
         <div className="winner-list">
-          {rows.map(({ p, away, win }, idx) => (
+          {rows.map(({ p, away, win, score }, idx) => (
             <div className="winner-row" key={p.id || p.user_id}>
               <div className="rank">{win >= 0 ? '🏆' : idx + 1}</div>
               <div className="avatar">{(p.name || '?')[0].toUpperCase()}</div>
@@ -251,7 +257,10 @@ function PlayersSheet({ players, pattern, uid, myMarked, hostId, winners, onClos
                 {key(p.user_id) === key(uid) && <span className="dim"> (you)</span>}
                 {key(p.user_id) === key(hostId) && <span className="tag-host" style={{ marginLeft: 8 }}>HOST</span>}
               </div>
-              <div className="away">{win >= 0 ? (['1st', '2nd', '3rd'][win] || `${win + 1}th`) : (away === 0 ? 'BINGO' : `${away} away`)}</div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="away">{win >= 0 ? (['1st', '2nd', '3rd'][win] || `${win + 1}th`) : `${score} pts`}</div>
+                {win < 0 && <div className="dim" style={{ fontSize: 11 }}>{away === 0 ? 'BINGO' : `${away} away`}</div>}
+              </div>
             </div>
           ))}
         </div>
@@ -317,19 +326,22 @@ function TileSheet({ trope, marked, onClose, onDab, onSnap }) {
   )
 }
 
-function StatsSheet({ pts, away, marked, liveOn, onToggleLive, onClose }) {
+function StatsSheet({ pts, away, marked, me, liveOn, onToggleLive, onClose }) {
   const contentMarked = [...marked].filter((x) => x !== FREE_INDEX).length
+  const total = me?.score ?? pts.total
+  const snapped = me?.photos_taken ?? pts.snaps
+  const repeats = me?.extra_taps ?? pts.repeats
   return (
     <div className="sheet-scrim" onClick={onClose}>
       <div className="sheet sheet-dark" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
         <button className="close" onClick={onClose}>✕</button>
         <h2>My Stats</h2>
         <div className="dim tiny">{away === 0 ? 'BINGO!' : `${away} away`} · {contentMarked}/24 marked</div>
-        <div className="points-hero"><div className="dim">Total Points</div><div className="n">{pts.total}</div></div>
+        <div className="points-hero"><div className="dim">Total Points</div><div className="n">{total}</div></div>
         <div className="stat-grid">
-          <div className="stat"><div className="n">{pts.dabs}</div><div className="lbl">Dabbed</div></div>
-          <div className="stat"><div className="n">{pts.snaps}</div><div className="lbl">Snapped</div></div>
-          <div className="stat"><div className="n">{pts.repeats}</div><div className="lbl">Repeats</div></div>
+          <div className="stat"><div className="n">{contentMarked}</div><div className="lbl">Dabbed</div></div>
+          <div className="stat"><div className="n">{snapped}</div><div className="lbl">Snapped</div></div>
+          <div className="stat"><div className="n">{repeats}</div><div className="lbl">Repeats</div></div>
         </div>
         <button className="toggle-row" onClick={onToggleLive}>
           <div><div style={{ fontWeight: 700 }}>Live activity</div>

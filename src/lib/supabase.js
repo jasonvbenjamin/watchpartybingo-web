@@ -66,6 +66,20 @@ export async function claimBingo(gameId) {
   return data
 }
 
+/** Snap (photo) — +2 bonus on top of the square's dab point (= 3 total). */
+export async function recordSnap(gameId) {
+  const { data, error } = await supabase.rpc('record_snap', { p_game_id: gameId })
+  if (error) throw error
+  return data
+}
+
+/** Repeat tap on an already-marked square — +1. */
+export async function recordRepeat(gameId) {
+  const { data, error } = await supabase.rpc('record_repeat', { p_game_id: gameId })
+  if (error) throw error
+  return data
+}
+
 export async function leaveGame(gameId) {
   await supabase.rpc('leave_game', { p_game_id: gameId }).catch(() => {})
 }
