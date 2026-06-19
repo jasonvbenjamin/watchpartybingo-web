@@ -214,3 +214,30 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
   border: 1px solid rgba(52,199,89,0.3); color: #7ee2a0; font-weight: 700; text-align: center; }
 
 .lp-foot { text-align: center; color: var(--text-tertiary); padding: 18px 0 4px; font-size: 16px; }
+
+/* Genre carousel — the fun showcase */
+.lp-genres { margin: 0 -16px 24px; }
+.lp-genres h2 { font-size: 20px; margin: 0 16px 12px; }
+.genre-row { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory;
+  padding: 6px 16px 10px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.genre-row::-webkit-scrollbar { display: none; }
+.genre-card { flex: 0 0 80%; max-width: 290px; scroll-snap-align: center; position: relative; overflow: hidden;
+  border-radius: 20px; padding: 16px; background: var(--surface); border: 1px solid var(--hairline);
+  box-shadow: 0 22px 48px -26px var(--tint); }
+.genre-card::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(130% 80% at 50% -12%, var(--tint), transparent 62%);
+  opacity: 0.22; animation: tintBreathe 4.5s ease-in-out infinite; }
+@keyframes tintBreathe { 0%, 100% { opacity: 0.16; } 50% { opacity: 0.30; } }
+.genre-head { position: relative; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.genre-emoji { font-size: 28px; }
+.genre-name { font-size: 19px; }
+.genre-tiles { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.genre-tile { background: rgba(255,255,255,0.95); color: #14141c; border-radius: 12px; padding: 9px 8px;
+  display: flex; flex-direction: column; gap: 4px; min-height: 60px; }
+.genre-tile .ge { font-size: 17px; line-height: 1; }
+.genre-tile .gt { font-size: 11px; font-weight: 800; line-height: 1.15; }
+.genre-hint { text-align: center; font-size: 13px; margin-top: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .genre-card::before { animation: none !important; }
+}

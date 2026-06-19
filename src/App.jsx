@@ -496,6 +496,8 @@ function Landing({ onJoin }) {
           <a className="lp-link" href="?preview=1">Peek at a live board →</a>
         </section>
 
+        <GenreCarousel />
+
         <section className="lp-how">
           <h2 className="display">How it works</h2>
           <div className="lp-steps">
@@ -543,6 +545,75 @@ function BetaSignup() {
               {busy ? 'Joining…' : 'Join the beta'}
             </button>
           </form>}
+    </section>
+  )
+}
+
+// Fun genre cards for the landing showcase — the humor IS the pitch.
+const GENRE_CARDS = [
+  { name: 'Rom-Com', emoji: '💘', tint: '#FF5FA2', tropes: [
+    ['🛫', 'Airport dash'], ['🌧️', 'Rain kiss'], ['😤', 'Hate → love'],
+    ['🙅', 'Wrong guy first'], ['🤦', 'Big misunderstanding'], ['💄', 'Makeover reveal'] ] },
+  { name: 'Reality TV', emoji: '📺', tint: '#7D3BFF', tropes: [
+    ['😈', "Not here to make friends"], ['🎙️', "Producer's voice"], ['😭', 'Dramatic confessional'],
+    ['🍷', 'Drink gets thrown'], ['🎬', 'Villain edit'], ['⏭️', 'To be continued…'] ] },
+  { name: 'NBA', emoji: '🏀', tint: '#F0820F', tropes: [
+    ['👴', 'Back in my day'], ['😱', 'Flagrant review'], ['👔', 'Coach loses it'],
+    ['🗣️', 'And-one yell'], ['✈️', 'Poster dunk'], ['📣', 'Ref gets booed'] ] },
+  { name: 'Horror', emoji: '🔪', tint: '#34C759', tropes: [
+    ['🚪', "Don't go in there"], ['👻', "It's behind you"], ['🚗', "Car won't start"],
+    ['👥', 'Splits the group'], ['🔪', "Killer's not dead"], ['📵', 'No signal'] ] },
+  { name: 'Holiday Movies', emoji: '🎄', tint: '#E23B5A', tropes: [
+    ['🏙️', 'Quits the big city'], ['❄️', 'Snow on cue'], ['🎄', 'Tree lighting'],
+    ['🤴', 'Secret prince'], ['🍪', 'Bake-off save'], ['😬', 'Almost-kiss'] ] },
+  { name: 'Cooking Shows', emoji: '👨‍🍳', tint: '#FFB000', tropes: [
+    ['🥩', 'Raw in the middle'], ['🚪', 'Walks out'], ['🍡', '"Deconstructed…"'],
+    ['⏸️', "Judge's dramatic pause"], ['⏰', 'Out of time'], ['😢', 'Crying backstory'] ] },
+  { name: 'Award Shows', emoji: '🏆', tint: '#B43BFF', tropes: [
+    ['🎵', 'Played off stage'], ['👯', 'Surprise reunion'], ['✊', 'Political speech'],
+    ['📷', 'Camera on the loser'], ['👗', 'Wardrobe slip'], ['🕯️', 'In Memoriam tears'] ] },
+]
+
+function GenreCarousel() {
+  const ref = useRef(null)
+  const idx = useRef(0)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    let stopped = false
+    const stop = () => { stopped = true }
+    el.addEventListener('pointerdown', stop, { once: true })   // yield to the user
+    const id = setInterval(() => {
+      const node = ref.current
+      if (stopped || !node) return
+      idx.current = (idx.current + 1) % node.children.length
+      const card = node.children[idx.current]
+      if (!card) return
+      const delta = card.getBoundingClientRect().left - node.getBoundingClientRect().left
+        - (node.clientWidth - card.clientWidth) / 2
+      node.scrollBy({ left: delta, behavior: 'smooth' })
+    }, 3800)
+    return () => { clearInterval(id); el.removeEventListener('pointerdown', stop) }
+  }, [])
+  return (
+    <section className="lp-genres">
+      <h2 className="display">Spot these live</h2>
+      <div className="genre-row" ref={ref}>
+        {GENRE_CARDS.map((g) => (
+          <article className="genre-card" key={g.name} style={{ '--tint': g.tint }}>
+            <div className="genre-head">
+              <span className="genre-emoji">{g.emoji}</span>
+              <span className="genre-name display">{g.name}</span>
+            </div>
+            <div className="genre-tiles">
+              {g.tropes.map(([e, t]) => (
+                <div className="genre-tile" key={t}><span className="ge">{e}</span><span className="gt">{t}</span></div>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="genre-hint dim">swipe through the chaos →</div>
     </section>
   )
 }
