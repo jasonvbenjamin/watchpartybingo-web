@@ -81,7 +81,21 @@ export default function App() {
       setPlayers(await fetchPlayerStates(g.id))
       session.current = subscribeGame(g.id, {
         onGame: (row) => setGame((prev) => ({ ...prev, ...row })),
-        onPlayers: async () => setPlayers(await fetchPlayerStates(g.id)),
+        onPlayers: (payload) => {
+          // Splice the one changed row in by user_id instead of refetching the
+          // whole roster on every mark — O(1) per event vs O(N), so big parties
+          // (20-30 players) don't trigger a refetch storm during mark bursts.
+          if (!payload || payload.eventType === 'DELETE' || !payload.new) {
+            fetchPlayerStates(g.id).then(setPlayers).catch(() => {})
+            return
+          }
+          const row = payload.new
+          setPlayers((prev) => {
+            const i = prev.findIndex((p) => p.user_id === row.user_id)
+            if (i === -1) return [...prev, row]
+            const next = prev.slice(); next[i] = { ...next[i], ...row }; return next
+          })
+        },
         onPulse: (pl) => showPulse(pl),
       })
       setPhase('live')

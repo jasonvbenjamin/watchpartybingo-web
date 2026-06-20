@@ -104,8 +104,8 @@ export async function leaveGame(gameId) {
 }
 
 /** Subscribe to a game's live changes. Calls onGame(newGameRow) on any games
- *  change and onPlayers() whenever a player_states row changes (caller refetches).
- *  Returns an unsubscribe function. */
+ *  change and onPlayers(payload) on every player_states change (caller upserts the
+ *  one changed row by user_id — no full refetch). Returns an unsubscribe function. */
 export function subscribeGame(gameId, { onGame, onPlayers, onStatus, onPulse } = {}) {
   const channel = supabase
     .channel(`game:${gameId}`, { config: { broadcast: { self: false } } })
@@ -114,7 +114,7 @@ export function subscribeGame(gameId, { onGame, onPlayers, onStatus, onPulse } =
       (payload) => onGame?.(payload.new))
     .on('postgres_changes',
       { event: '*', schema: 'public', table: 'player_states', filter: `game_id=eq.${gameId}` },
-      () => onPlayers?.())
+      (payload) => onPlayers?.(payload))
     .on('broadcast', { event: 'tap_pulse' }, ({ payload }) => onPulse?.(payload))
     .subscribe((status) => onStatus?.(status))
   return {
