@@ -9,10 +9,13 @@ import { themeVars } from './lib/theme'
 const NAME_KEY = 'wpb-player-name'
 
 export default function App() {
-  const urlCode = useMemo(() => (
-    new URLSearchParams(location.search).get('code')
-    || decodeURIComponent(location.pathname.split('/join/')[1] || '')
-  ).toUpperCase(), [])
+  const urlCode = useMemo(() => {
+    const q = new URLSearchParams(location.search).get('code')
+    // Take only the first path segment after /join/ so /join/ABCD/ (trailing
+    // slash) or /join/ABCD/anything still yields a clean code.
+    const path = decodeURIComponent((location.pathname.split('/join/')[1] || '').split('/')[0])
+    return (q || path).trim().toUpperCase()
+  }, [])
 
   const [phase, setPhase] = useState(urlCode ? 'name' : 'landing')  // landing | name | live
   const [code, setCode] = useState(urlCode)
@@ -406,6 +409,8 @@ function prettyPattern(p) {
 function humanize(e) {
   const m = (e?.message || '').toLowerCase()
   if (m.includes('recursion')) return 'Server hiccup — try again in a sec.'
+  if (m.includes('not_authenticated')) return 'Could not start your session — refresh and try again.'
+  if (m.includes('not_joinable')) return 'This game is no longer taking new players.'
   if (m.includes('not_found') || m.includes('invalid') || m.includes('no rows')) return "That code didn't match a game."
   if (m.includes('full')) return 'That room is full.'
   if (m.includes('name')) return 'Someone already has that name — try another.'
