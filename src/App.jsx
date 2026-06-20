@@ -528,27 +528,34 @@ function BetaSignup() {
   )
 }
 
-// Genre clusters orbiting the logo — each with its category icon + a few of its
-// funniest tropes. x/y place them around the hub on desktop; they stack on mobile.
-const CLUSTERS = [
-  { name: 'Rom-Com', icon: '💘', tint: '#FF5FA2', x: '19%', y: '21%',
-    tropes: ['🌧️ The rain kiss', '🛫 Airport dash', '😬 The almost-kiss'] },
-  { name: 'Reality TV', icon: '📺', tint: '#B43BFF', x: '81%', y: '18%',
-    tropes: ['😈 “Not here to make friends”', '😭 Crying confessional', '🍷 A drink gets thrown'] },
-  { name: 'Sports', icon: '🏀', tint: '#F0820F', x: '10%', y: '53%',
-    tropes: ['👴 “Back in my day…”', '👔 Coach loses it', '✈️ Poster dunk'] },
-  { name: 'Horror', icon: '🔪', tint: '#34C759', x: '90%', y: '51%',
-    tropes: ['🚪 “Don’t go in there”', '🔪 Killer isn’t dead', '📵 “No signal!”'] },
-  { name: 'Holiday', icon: '🎄', tint: '#E23B5A', x: '22%', y: '84%',
-    tropes: ['🏙️ Quits the big city', '❄️ Snows on cue', '🤴 Secretly a prince'] },
-  { name: 'Cooking', icon: '👨‍🍳', tint: '#FFB000', x: '79%', y: '85%',
-    tropes: ['🥩 Raw in the middle', '🍡 “Deconstructed…”', '⏰ Out of time'] },
+// Each genre surfaces one at a time as a mindmap branch off the logo, rendered in
+// the game's tile style. Slow, organic fade in/out, alternating sides. Tap to dab.
+const GENRES = [
+  { name: 'Rom-Com', icon: '💘', tint: '#FF5FA2', tropes: [['🌧️','The rain kiss'],['🛫','Airport dash'],['😬','The almost-kiss'],['😤','Enemies → lovers']] },
+  { name: 'Reality TV', icon: '📺', tint: '#B43BFF', tropes: [['😈','“Not here to make friends”'],['😭','Crying confessional'],['🍷','A drink gets thrown'],['🎬','The villain edit']] },
+  { name: 'Sports', icon: '🏀', tint: '#F0820F', tropes: [['👴','“Back in my day…”'],['👔','Coach loses it'],['✈️','Poster dunk'],['📣','Ref gets booed']] },
+  { name: 'Horror', icon: '🔪', tint: '#34C759', tropes: [['🚪','“Don’t go in there”'],['🔪','Killer isn’t dead'],['📵','“No signal!”'],['🚗','Car won’t start']] },
+  { name: 'Holiday', icon: '🎄', tint: '#E23B5A', tropes: [['🏙️','Quits the big city'],['❄️','Snows on cue'],['🤴','Secretly a prince'],['🍪','The bake-off save']] },
+  { name: 'Cooking', icon: '👨‍🍳', tint: '#FFB000', tropes: [['🥩','Raw in the middle'],['🍡','“Deconstructed…”'],['⏰','Out of time'],['😢','Crying backstory']] },
 ]
 
 function Constellation({ onJoin }) {
   const [code, setCode] = useState('')
+  const [gi, setGi] = useState(0)
+  const [shown, setShown] = useState(true)
   const [dabbed, setDabbed] = useState(() => new Set())
+  const reduce = useRef(false)
+  useEffect(() => { reduce.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches }, [])
+  useEffect(() => {
+    if (reduce.current) return
+    setShown(true)
+    const tOut = setTimeout(() => setShown(false), 5400)
+    const tNext = setTimeout(() => setGi((x) => (x + 1) % GENRES.length), 6400)
+    return () => { clearTimeout(tOut); clearTimeout(tNext) }
+  }, [gi])
   const dab = (t) => { buzz(14); setDabbed((p) => { const n = new Set(p); n.has(t) ? n.delete(t) : n.add(t); return n }) }
+  const g = GENRES[gi]
+  const side = gi % 2 === 0 ? 'left' : 'right'
   return (
     <div className="constellation">
       <div className="logo-hub">
@@ -563,14 +570,16 @@ function Constellation({ onJoin }) {
         </form>
         <a className="lp-link" href="?preview=1">Peek at a live board →</a>
       </div>
-      {CLUSTERS.map((c) => (
-        <div className="cluster" key={c.name} style={{ '--x': c.x, '--y': c.y, '--tint': c.tint }}>
-          <div className="cluster-head"><span className="cluster-ic">{c.icon}</span><span className="cluster-nm">{c.name}</span></div>
-          {c.tropes.map((t) => (
-            <button key={t} className={`chip${dabbed.has(t) ? ' dabbed' : ''}`} onClick={() => dab(t)}>{t}</button>
+      <div className={`branch branch-${side} ${shown ? 'in' : 'out'}`} style={{ '--tint': g.tint }}>
+        <div className="branch-node"><span className="branch-ic">{g.icon}</span><span className="branch-nm display">{g.name}</span></div>
+        <div className="branch-list">
+          {g.tropes.map(([e, t]) => (
+            <button key={t} className={`gtile${dabbed.has(t) ? ' marked' : ''}`} onClick={() => dab(t)}>
+              <span className="gtile-e">{e}</span><span className="gtile-t">{t}</span>
+            </button>
           ))}
         </div>
-      ))}
+      </div>
     </div>
   )
 }
