@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["3NT58DLX5Y.app.rork.gpwsbqpccxd77ad80mxqu"],
+        "components": [
+          {
+            "/": "/join/*",
+            "comment": "Invite links open the app directly on the join screen."
+          }
+        ]
+      }
+    ]
+  }
+}
