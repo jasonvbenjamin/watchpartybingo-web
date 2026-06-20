@@ -187,46 +187,63 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 
 /* ---- Marketing landing page ---- */
 .display { font-family: 'Dela Gothic One', system-ui, -apple-system, sans-serif; }
-.landing .wrap.lp { padding-top: 30px; }
-.lp section, .lp header { margin-bottom: 22px; }
-.lp-hero { margin-bottom: 28px; }
+.landing .wrap.lp { padding-top: 10px; }
+.lp section { margin-bottom: 22px; }
 .lp-wordmark { display: flex; flex-direction: column; line-height: 0.92; letter-spacing: -0.01em;
-  font-family: 'Dela Gothic One', system-ui, sans-serif; font-size: clamp(46px, 15vw, 76px); margin-bottom: 16px; }
+  font-family: 'Dela Gothic One', system-ui, sans-serif; font-size: clamp(44px, 13vw, 72px); margin-bottom: 12px; }
 .lp-wordmark .w { color: #fff; }
 .lp-wordmark .p { color: var(--accent); }
 .lp-wordmark .b { color: var(--accent-2); }
-.lp-tag { color: var(--text-dim); font-size: 17px; line-height: 1.5; max-width: 32ch; margin: 0; }
 
+/* Constellation hero — the logo hub, with genre clusters orbiting it */
+.constellation { position: relative; padding: 30px 16px 6px; }
+.logo-hub { max-width: 460px; margin: 0 auto 26px; text-align: center; }
+.logo-hub .lp-wordmark { align-items: center; }
+.hub-tag { color: var(--text-dim); font-size: 16px; margin: 6px 0 16px; }
+.hub-join { display: flex; gap: 8px; }
+.hub-join .code-field { flex: 1; }
+.hub-join .btn { width: auto; flex: none; padding: 16px 24px; }
+.logo-hub .lp-link { display: inline-block; margin-top: 12px; }
+
+.cluster { max-width: 360px; margin: 0 auto 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.cluster-head { display: flex; align-items: center; gap: 9px; }
+.cluster-ic { width: 34px; height: 34px; flex: none; display: flex; align-items: center; justify-content: center;
+  font-size: 18px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--hairline);
+  box-shadow: 0 6px 20px -8px var(--tint); }
+.cluster-nm { font-weight: 800; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-dim); }
+
+/* Shared chip (clusters) */
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px; border-radius: 13px;
+  background: var(--surface); border: 1px solid var(--hairline); color: var(--text);
+  font-size: 14px; font-weight: 700; line-height: 1.15; cursor: pointer; transition: transform .12s ease; }
+.chip:active { transform: scale(0.96); }
+.chip.dabbed { background: var(--gradient); border-color: transparent; color: #fff; animation: chipPop .28s ease; }
+@keyframes chipPop { 0% { transform: scale(0.9); } 55% { transform: scale(1.07); } 100% { transform: scale(1); } }
+
+@media (min-width: 960px) {
+  .constellation { min-height: 82vh; padding: 24px;
+    background: radial-gradient(circle at 50% 47%, rgba(125,59,255,0.13), transparent 56%); }
+  .constellation .logo-hub { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(440px, 44vw); margin: 0; z-index: 3; }
+  .constellation .cluster { position: absolute; top: var(--y); left: var(--x); transform: translate(-50%, -50%);
+    width: max-content; max-width: 230px; margin: 0; z-index: 1; }
+  .landing .wrap.lp { padding-top: 6px; }
+}
+
+/* How it works + beta */
 .lp-card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 18px; padding: 20px; }
 .lp-card-title { font-weight: 800; font-size: 18px; margin-bottom: 12px; }
-.lp-link { display: inline-block; margin-top: 12px; color: var(--accent); font-weight: 700; font-size: 14px; text-decoration: none; }
-
-.lp-how h2 { font-size: 20px; margin: 0 0 14px; }
+.lp-link { color: var(--accent); font-weight: 700; font-size: 14px; text-decoration: none; }
+.lp-how h2 { font-size: 22px; margin: 0 0 14px; }
 .lp-steps { display: flex; flex-direction: column; gap: 12px; }
 .lp-step { display: flex; gap: 14px; align-items: flex-start; }
 .lp-emoji { font-size: 24px; width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center;
   background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px; }
 .lp-step-t { font-weight: 800; }
 .lp-step-d { color: var(--text-dim); font-size: 14px; line-height: 1.35; }
-
 .lp-beta { background: var(--surface-2); }
 .lp-done { padding: 14px; border-radius: 12px; background: rgba(52,199,89,0.12);
   border: 1px solid rgba(52,199,89,0.3); color: #7ee2a0; font-weight: 700; text-align: center; }
-
 .lp-foot { text-align: center; color: var(--text-tertiary); padding: 18px 0 4px; font-size: 16px; }
-
-/* "You've seen these" trope wall — the tropes are the hero, no forced motion */
-.lp-wall { margin-bottom: 26px; }
-.lp-wall h2 { font-size: 23px; line-height: 1.1; margin: 0 0 4px; }
-.lp-wall > p { margin: 0 0 16px; }
-.wall { display: flex; flex-wrap: wrap; gap: 10px; }
-.chip { display: inline-flex; align-items: center; gap: 8px; padding: 11px 15px; border-radius: 14px;
-  background: var(--surface); border: 1px solid var(--hairline); color: var(--text);
-  font-size: 15px; font-weight: 700; line-height: 1.15; cursor: pointer; transition: transform .12s ease; }
-.chip .chip-e { font-size: 17px; }
-.chip:active { transform: scale(0.96); }
-.chip.dabbed { background: var(--gradient); border-color: transparent; color: #fff; animation: chipPop .28s ease; }
-@keyframes chipPop { 0% { transform: scale(0.9); } 55% { transform: scale(1.07); } 100% { transform: scale(1); } }
-.wall-count { margin-top: 18px; min-height: 22px; font-weight: 800; font-size: 15px; color: var(--accent-2); }
 
 @media (prefers-reduced-motion: reduce) { .chip.dabbed { animation: none !important; } }

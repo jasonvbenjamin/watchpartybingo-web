@@ -473,31 +473,10 @@ function chime() {
 
 // ---- Marketing landing page (the front door) ----
 function Landing({ onJoin }) {
-  const [code, setCode] = useState('')
   return (
     <div className="screen landing">
+      <Constellation onJoin={onJoin} />
       <div className="wrap lp">
-        <header className="lp-hero">
-          <div className="lp-wordmark">
-            <span className="w">Watch</span>
-            <span className="p">Party</span>
-            <span className="b">Bingo!</span>
-          </div>
-          <p className="lp-tag">Live bingo for your watch parties. Spot the tropes as they happen, snap the moments, and race your friends to a bingo.</p>
-        </header>
-
-        <section className="lp-card">
-          <div className="lp-card-title">Got a game code?</div>
-          <form onSubmit={(e) => { e.preventDefault(); if (code.trim()) onJoin(code.trim().toUpperCase()) }}>
-            <input className="field code-field" placeholder="CODE" value={code} maxLength={12}
-              autoCapitalize="characters" onChange={(e) => setCode(e.target.value.toUpperCase())} />
-            <button className="btn" type="submit" disabled={!code.trim()} style={{ marginTop: 10 }}>Join the game</button>
-          </form>
-          <a className="lp-link" href="?preview=1">Peek at a live board →</a>
-        </section>
-
-        <TropeWall />
-
         <section className="lp-how">
           <h2 className="display">How it works</h2>
           <div className="lp-steps">
@@ -549,61 +528,49 @@ function BetaSignup() {
   )
 }
 
-// The tropes ARE the pitch — evocative phrasing that makes people remember their
-// own TV moments. A flowing wall, mixed across genres; tap to "dab" like the game.
-const TROPES = [
-  ['🌧️', 'The rain kiss'],
-  ['🛫', 'Airport dash to stop them leaving'],
-  ['😤', 'Enemies, then lovers'],
-  ['📺', '"I\'m not here to make friends"'],
-  ['😭', 'Crying in the confessional'],
-  ['🍷', 'A drink gets thrown'],
-  ['🏀', '"Back in my day…"'],
-  ['👔', 'Coach loses it at the ref'],
-  ['✈️', "Dunk on somebody's whole career"],
-  ['🔪', "The killer isn't actually dead"],
-  ['📵', '"There\'s no signal!"'],
-  ['🎄', 'Quits the big city for love'],
-  ['❄️', 'It snows right on cue'],
-  ['🤴', 'He was secretly a prince'],
-  ['👨‍🍳', '"It\'s a deconstructed…"'],
-  ['⏰', 'Out of time with raw chicken'],
-  ['🏆', 'Played off stage mid-speech'],
-  ['👗', 'The wardrobe malfunction'],
-  ['😬', 'The almost-kiss interruption'],
-  ['🕯️', 'Crying during In Memoriam'],
-  ['🚗', "The car won't start"],
-  ['💍', 'The reunion proposal'],
+// Genre clusters orbiting the logo — each with its category icon + a few of its
+// funniest tropes. x/y place them around the hub on desktop; they stack on mobile.
+const CLUSTERS = [
+  { name: 'Rom-Com', icon: '💘', tint: '#FF5FA2', x: '19%', y: '21%',
+    tropes: ['🌧️ The rain kiss', '🛫 Airport dash', '😬 The almost-kiss'] },
+  { name: 'Reality TV', icon: '📺', tint: '#B43BFF', x: '81%', y: '18%',
+    tropes: ['😈 “Not here to make friends”', '😭 Crying confessional', '🍷 A drink gets thrown'] },
+  { name: 'Sports', icon: '🏀', tint: '#F0820F', x: '10%', y: '53%',
+    tropes: ['👴 “Back in my day…”', '👔 Coach loses it', '✈️ Poster dunk'] },
+  { name: 'Horror', icon: '🔪', tint: '#34C759', x: '90%', y: '51%',
+    tropes: ['🚪 “Don’t go in there”', '🔪 Killer isn’t dead', '📵 “No signal!”'] },
+  { name: 'Holiday', icon: '🎄', tint: '#E23B5A', x: '22%', y: '84%',
+    tropes: ['🏙️ Quits the big city', '❄️ Snows on cue', '🤴 Secretly a prince'] },
+  { name: 'Cooking', icon: '👨‍🍳', tint: '#FFB000', x: '79%', y: '85%',
+    tropes: ['🥩 Raw in the middle', '🍡 “Deconstructed…”', '⏰ Out of time'] },
 ]
 
-function TropeWall() {
+function Constellation({ onJoin }) {
+  const [code, setCode] = useState('')
   const [dabbed, setDabbed] = useState(() => new Set())
-  function toggle(i) {
-    buzz(14)
-    setDabbed((prev) => {
-      const next = new Set(prev)
-      next.has(i) ? next.delete(i) : next.add(i)
-      return next
-    })
-  }
-  const n = dabbed.size
+  const dab = (t) => { buzz(14); setDabbed((p) => { const n = new Set(p); n.has(t) ? n.delete(t) : n.add(t); return n }) }
   return (
-    <section className="lp-wall">
-      <h2 className="display">You've seen these. Admit it.</h2>
-      <p className="dim">Tap every one you've witnessed →</p>
-      <div className="wall">
-        {TROPES.map(([e, t], i) => (
-          <button key={t} className={`chip${dabbed.has(i) ? ' dabbed' : ''}`} onClick={() => toggle(i)}>
-            <span className="chip-e">{e}</span>{t}
-          </button>
-        ))}
+    <div className="constellation">
+      <div className="logo-hub">
+        <div className="lp-wordmark">
+          <span className="w">Watch</span><span className="p">Party</span><span className="b">Bingo!</span>
+        </div>
+        <p className="hub-tag">Live bingo for your watch parties.</p>
+        <form className="hub-join" onSubmit={(e) => { e.preventDefault(); if (code.trim()) onJoin(code.trim().toUpperCase()) }}>
+          <input className="field code-field" placeholder="GAME CODE" value={code} maxLength={12}
+            autoCapitalize="characters" onChange={(e) => setCode(e.target.value.toUpperCase())} />
+          <button className="btn" type="submit" disabled={!code.trim()}>Join</button>
+        </form>
+        <a className="lp-link" href="?preview=1">Peek at a live board →</a>
       </div>
-      <div className="wall-count">
-        {n === 0 ? ' '
-          : n < 5 ? `${n} witnessed — keep going 👀`
-          : n < 10 ? `${n} witnessed — you watch way too much TV (respect) 📺`
-          : `${n} witnessed — you'd dominate. Grab a code from a friend ↑`}
-      </div>
-    </section>
+      {CLUSTERS.map((c) => (
+        <div className="cluster" key={c.name} style={{ '--x': c.x, '--y': c.y, '--tint': c.tint }}>
+          <div className="cluster-head"><span className="cluster-ic">{c.icon}</span><span className="cluster-nm">{c.name}</span></div>
+          {c.tropes.map((t) => (
+            <button key={t} className={`chip${dabbed.has(t) ? ' dabbed' : ''}`} onClick={() => dab(t)}>{t}</button>
+          ))}
+        </div>
+      ))}
+    </div>
   )
 }
