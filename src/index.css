@@ -190,7 +190,7 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 .landing .wrap.lp { padding-top: 10px; }
 .lp section { margin-bottom: 22px; }
 .lp-wordmark { display: flex; flex-direction: column; line-height: 0.92; letter-spacing: -0.01em;
-  font-family: 'Dela Gothic One', system-ui, sans-serif; font-size: clamp(44px, 13vw, 72px); margin-bottom: 12px; }
+  font-family: 'Dela Gothic One', system-ui, sans-serif; font-size: clamp(42px, 12vw, 66px); margin-bottom: 12px; }
 .lp-wordmark .w { color: #fff; }
 .lp-wordmark .p { color: var(--accent); }
 .lp-wordmark .b { color: var(--accent-2); }
@@ -227,14 +227,15 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 .gtile:active { transform: scale(0.96); }
 .gtile.marked { background: var(--gradient); color: #fff; border-color: transparent; }
 
-@media (min-width: 1120px) {
-  .constellation { min-height: 82vh; padding: 24px;
-    background: radial-gradient(circle at 50% 48%, rgba(125,59,255,0.13), transparent 56%); }
-  .constellation .logo-hub { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: min(380px, 34vw); margin: 0; z-index: 3; }
-  .constellation .branch { position: absolute; top: 50%; transform: translateY(-50%); width: 264px; margin: 0; z-index: 1; }
-  .constellation .branch-left { left: 4%; }
-  .constellation .branch-right { right: 4%; }
+@media (min-width: 960px) {
+  .constellation { min-height: 86vh; padding: 20px;
+    background: radial-gradient(circle at 50% 50%, rgba(125,59,255,0.12), transparent 58%); }
+  .constellation .logo-hub { position: absolute; top: 48%; left: 50%; transform: translate(-50%, -50%);
+    width: min(360px, 38vw); margin: 0; z-index: 3; }
+  /* Genres surface in opposite corners so they always clear the central hub. */
+  .constellation .branch { position: absolute; width: 262px; margin: 0; z-index: 1; }
+  .constellation .branch-right { right: 4%; top: 6%; }
+  .constellation .branch-left { left: 4%; bottom: 6%; }
   .landing .wrap.lp { padding-top: 6px; }
 }
 
