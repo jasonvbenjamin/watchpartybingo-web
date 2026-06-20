@@ -227,14 +227,14 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 .gtile:active { transform: scale(0.96); }
 .gtile.marked { background: var(--gradient); color: #fff; border-color: transparent; }
 
-@media (min-width: 900px) {
-  .constellation { min-height: 80vh; padding: 24px;
+@media (min-width: 1120px) {
+  .constellation { min-height: 82vh; padding: 24px;
     background: radial-gradient(circle at 50% 48%, rgba(125,59,255,0.13), transparent 56%); }
   .constellation .logo-hub { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: min(440px, 44vw); margin: 0; z-index: 3; }
-  .constellation .branch { position: absolute; top: 50%; transform: translateY(-50%); width: 300px; margin: 0; z-index: 1; }
-  .constellation .branch-left { left: 8%; }
-  .constellation .branch-right { right: 8%; }
+    width: min(380px, 34vw); margin: 0; z-index: 3; }
+  .constellation .branch { position: absolute; top: 50%; transform: translateY(-50%); width: 264px; margin: 0; z-index: 1; }
+  .constellation .branch-left { left: 4%; }
+  .constellation .branch-right { right: 4%; }
   .landing .wrap.lp { padding-top: 6px; }
 }
 
