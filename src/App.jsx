@@ -473,22 +473,40 @@ function chime() {
 
 // ---- Marketing landing page (the front door) ----
 function Landing({ onJoin }) {
+  const [code, setCode] = useState('')
   return (
     <div className="screen landing">
-      <Constellation onJoin={onJoin} />
       <div className="wrap lp">
+        <header className="lp-hero">
+          <div className="lp-wordmark">
+            <span className="w">Watch</span><span className="p">Party</span><span className="b">Bingo!</span>
+          </div>
+          <p className="lp-tag">Live bingo for your watch parties — spot the tropes as they happen, snap the moments, and race your friends to a bingo.</p>
+        </header>
+
+        <section className="lp-card">
+          <div className="lp-card-title">Got a game code?</div>
+          <form className="hub-join" onSubmit={(e) => { e.preventDefault(); if (code.trim()) onJoin(code.trim().toUpperCase()) }}>
+            <input className="field code-field" placeholder="GAME CODE" value={code} maxLength={12}
+              autoCapitalize="characters" onChange={(e) => setCode(e.target.value.toUpperCase())} />
+            <button className="btn" type="submit" disabled={!code.trim()}>Join</button>
+          </form>
+          <a className="lp-link" href="?preview=1">See a sample card →</a>
+        </section>
+
         <section className="lp-how">
           <h2 className="display">How it works</h2>
-          <div className="lp-steps">
+          <div className="how-grid">
             {[
               ['🎬', 'Pick a theme', 'NBA, reality TV, holiday movies & more.'],
               ['🔗', 'Share a link', 'Friends tap and play — no app required.'],
               ['📸', 'Spot & snap', 'Dab a trope for a point, snap a photo for three.'],
               ['🏆', 'Race to bingo', 'Live leaderboard — first to the pattern wins.'],
             ].map(([e, t, d]) => (
-              <div className="lp-step" key={t}>
-                <div className="lp-emoji">{e}</div>
-                <div><div className="lp-step-t">{t}</div><div className="lp-step-d">{d}</div></div>
+              <div className="how-cell" key={t}>
+                <div className="how-ic">{e}</div>
+                <div className="how-t">{t}</div>
+                <div className="how-d">{d}</div>
               </div>
             ))}
           </div>
@@ -525,52 +543,5 @@ function BetaSignup() {
             </button>
           </form>}
     </section>
-  )
-}
-
-// Each genre surfaces one at a time as a mindmap branch off the logo, rendered in
-// the game's tile style. Slow, organic fade in/out, alternating sides. Tap to dab.
-const GENRES = [
-  { name: 'Rom-Com', icon: '💘', tint: '#FF5FA2', tropes: [['🌧️','The rain kiss'],['🛫','Airport dash'],['😬','The almost-kiss'],['😤','Enemies → lovers']] },
-  { name: 'Reality TV', icon: '📺', tint: '#B43BFF', tropes: [['😈','“Not here to make friends”'],['😭','Crying confessional'],['🍷','A drink gets thrown'],['🎬','The villain edit']] },
-  { name: 'Sports', icon: '🏀', tint: '#F0820F', tropes: [['👴','“Back in my day…”'],['👔','Coach loses it'],['✈️','Poster dunk'],['📣','Ref gets booed']] },
-  { name: 'Horror', icon: '🔪', tint: '#34C759', tropes: [['🚪','“Don’t go in there”'],['🔪','Killer isn’t dead'],['📵','“No signal!”'],['🚗','Car won’t start']] },
-  { name: 'Holiday', icon: '🎄', tint: '#E23B5A', tropes: [['🏙️','Quits the big city'],['❄️','Snows on cue'],['🤴','Secretly a prince'],['🍪','The bake-off save']] },
-  { name: 'Cooking', icon: '👨‍🍳', tint: '#FFB000', tropes: [['🥩','Raw in the middle'],['🍡','“Deconstructed…”'],['⏰','Out of time'],['😢','Crying backstory']] },
-]
-
-function Constellation({ onJoin }) {
-  const [code, setCode] = useState('')
-  const [dabbed, setDabbed] = useState(() => new Set())
-  const dab = (t) => { buzz(14); setDabbed((p) => { const n = new Set(p); n.has(t) ? n.delete(t) : n.add(t); return n }) }
-  return (
-    <div className="hero">
-      <div className="logo-hub">
-        <div className="lp-wordmark">
-          <span className="w">Watch</span><span className="p">Party</span><span className="b">Bingo!</span>
-        </div>
-        <p className="hub-tag">Live bingo for your watch parties.</p>
-        <form className="hub-join" onSubmit={(e) => { e.preventDefault(); if (code.trim()) onJoin(code.trim().toUpperCase()) }}>
-          <input className="field code-field" placeholder="GAME CODE" value={code} maxLength={12}
-            autoCapitalize="characters" onChange={(e) => setCode(e.target.value.toUpperCase())} />
-          <button className="btn" type="submit" disabled={!code.trim()}>Join</button>
-        </form>
-        <a className="lp-link" href="?preview=1">Peek at a live board →</a>
-      </div>
-      <div className="gcards">
-        {GENRES.map((g) => (
-          <div className="gcard" key={g.name} style={{ '--tint': g.tint }}>
-            <div className="gcard-head"><span className="gcard-ic">{g.icon}</span><span className="gcard-nm display">{g.name}</span></div>
-            <div className="gcard-grid">
-              {g.tropes.slice(0, 4).map(([e, t]) => (
-                <button key={t} className={`gtile2${dabbed.has(t) ? ' marked' : ''}`} onClick={() => dab(t)}>
-                  <span className="gtile2-e">{e}</span><span className="gtile2-t">{t}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
   )
 }
