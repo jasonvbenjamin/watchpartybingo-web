@@ -541,23 +541,10 @@ const GENRES = [
 
 function Constellation({ onJoin }) {
   const [code, setCode] = useState('')
-  const [gi, setGi] = useState(0)
-  const [shown, setShown] = useState(true)
   const [dabbed, setDabbed] = useState(() => new Set())
-  const reduce = useRef(false)
-  useEffect(() => { reduce.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches }, [])
-  useEffect(() => {
-    if (reduce.current) return
-    setShown(true)
-    const tOut = setTimeout(() => setShown(false), 5400)
-    const tNext = setTimeout(() => setGi((x) => (x + 1) % GENRES.length), 6400)
-    return () => { clearTimeout(tOut); clearTimeout(tNext) }
-  }, [gi])
   const dab = (t) => { buzz(14); setDabbed((p) => { const n = new Set(p); n.has(t) ? n.delete(t) : n.add(t); return n }) }
-  const g = GENRES[gi]
-  const side = gi % 2 === 0 ? 'left' : 'right'
   return (
-    <div className="constellation">
+    <div className="hero">
       <div className="logo-hub">
         <div className="lp-wordmark">
           <span className="w">Watch</span><span className="p">Party</span><span className="b">Bingo!</span>
@@ -570,15 +557,19 @@ function Constellation({ onJoin }) {
         </form>
         <a className="lp-link" href="?preview=1">Peek at a live board →</a>
       </div>
-      <div className={`branch branch-${side} ${shown ? 'in' : 'out'}`} style={{ '--tint': g.tint }}>
-        <div className="branch-node"><span className="branch-ic">{g.icon}</span><span className="branch-nm display">{g.name}</span></div>
-        <div className="branch-list">
-          {g.tropes.map(([e, t]) => (
-            <button key={t} className={`gtile${dabbed.has(t) ? ' marked' : ''}`} onClick={() => dab(t)}>
-              <span className="gtile-e">{e}</span><span className="gtile-t">{t}</span>
-            </button>
-          ))}
-        </div>
+      <div className="gcards">
+        {GENRES.map((g) => (
+          <div className="gcard" key={g.name} style={{ '--tint': g.tint }}>
+            <div className="gcard-head"><span className="gcard-ic">{g.icon}</span><span className="gcard-nm display">{g.name}</span></div>
+            <div className="gcard-grid">
+              {g.tropes.slice(0, 4).map(([e, t]) => (
+                <button key={t} className={`gtile2${dabbed.has(t) ? ' marked' : ''}`} onClick={() => dab(t)}>
+                  <span className="gtile2-e">{e}</span><span className="gtile2-t">{t}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
