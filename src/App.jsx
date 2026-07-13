@@ -59,13 +59,21 @@ export default function App() {
   const tropes = game?.custom_tropes || []
   const pattern = game?.pattern || 'line'
   const playing = game?.status === 'playing'
+  const finished = game?.status === 'finished'
   const winners = game?.winners || []
   const myAway = squaresAway(marked, pattern)
   const iWon = winners.some((w) => (w.user_id || '').toLowerCase() === (uid || '').toLowerCase())
+  // Public games: claim_bingo answers 'pending' and the server parks us in
+  // pending_winners until the host approves — derived, so a reject clears it too.
+  const iPending = !iWon && (game?.pending_winners || [])
+    .some((w) => (w.user_id || '').toLowerCase() === (uid || '').toLowerCase())
   const oneAway = playing && !iWon && !won && myAway === 1
   const me = players.find((p) => (p.user_id || '').toLowerCase() === (uid || '').toLowerCase())
   liveOnRef.current = liveOn
   useEffect(() => { if (oneAway) buzz(25) }, [oneAway])
+  // Celebrate on the server's word too (host-approved claims, or a lost claim
+  // response) — `won` drives the chime + confetti exactly once.
+  useEffect(() => { if (iWon) setWon(true) }, [iWon])
 
   async function handleJoin() {
     if (!code.trim() || !name.trim()) return
@@ -210,14 +218,25 @@ export default function App() {
         <button className="people" onClick={() => setPlayersOpen((o) => !o)} aria-label="Show players">👥 {players.length || 1}</button>
       </div>
 
-      {iWon && <div className="win-banner">🎉 BINGO! You won{rankSuffix(winners, uid)}.</div>}
-      {!iWon && winners.length > 0 && (
+      {iWon && !finished && (
+        <div className="win-banner">
+          🎉 BINGO! You won{rankSuffix(winners, uid)}. Keep dabbing — the show&apos;s not over!
+        </div>
+      )}
+      {!iWon && winners.length > 0 && !finished && (
         <div className="win-banner" style={{ background: 'rgba(255,255,255,0.06)', color: '#fff' }}>
-          🏆 {winners[0]?.name} got bingo{winners.length > 1 ? ` +${winners.length - 1} more` : ''}
+          🏆 {winners[0]?.name} got bingo{winners.length > 1 ? ` +${winners.length - 1} more` : ''} — still anyone&apos;s game for 2nd!
+        </div>
+      )}
+      {iPending && (
+        <div className="win-banner" style={{ background: 'rgba(255,255,255,0.06)', color: '#fff' }}>
+          🕐 Bingo claim sent — waiting for the host to confirm.
         </div>
       )}
 
-      {!playing ? (
+      {finished ? (
+        <GameOver players={players} winners={winners} pattern={pattern} uid={uid} watching={game?.watching} />
+      ) : !playing ? (
         <Lobby game={game} players={players} pattern={pattern} share={share} />
       ) : (
         <div className="board-area">
@@ -326,6 +345,53 @@ function Celebration() {
           animationDelay: `${(i % 10) * 0.07}s`,
         }} />
       ))}
+    </div>
+  )
+}
+
+/// The wrap-up screen — a finished game shows closing credits, not a fake lobby.
+/// Standings: bingo order first (claim order = rank), then points.
+function GameOver({ players, winners, pattern, uid, watching }) {
+  const key = (s) => (s || '').toLowerCase()
+  const winRank = (id) => winners.findIndex((w) => key(w.user_id) === key(id))
+  const rows = players
+    .map((p) => ({ p, win: winRank(p.user_id), score: p.score ?? 0, away: squaresAway(p.marked || [], pattern) }))
+    .sort((a, b) => {
+      if ((a.win >= 0) !== (b.win >= 0)) return a.win >= 0 ? -1 : 1
+      if (a.win >= 0 && b.win >= 0) return a.win - b.win
+      if (b.score !== a.score) return b.score - a.score
+      return a.away - b.away
+    })
+  const medal = (win, idx) => (win === 0 ? '🏆' : win === 1 ? '🥈' : win === 2 ? '🥉' : `${idx + 1}`)
+  const ord = (n) => ['1st', '2nd', '3rd'][n] || `${n + 1}th`
+  return (
+    <div className="wrap">
+      <div className="code-card" style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 44 }}>🏁</div>
+        <h1 style={{ margin: '6px 0' }}>That&apos;s a wrap!</h1>
+        <div className="dim tiny">
+          {winners.length === 0
+            ? 'No bingos this round — the TV won this one.'
+            : `${winners[0]?.name} was first to bingo${watching ? ` on ${watching}` : ''}.`}
+        </div>
+      </div>
+      <div style={{ height: 16 }} />
+      <div className="dim tiny" style={{ marginBottom: 8 }}>Final standings</div>
+      <div className="winner-list">
+        {rows.map(({ p, win, score }, idx) => (
+          <div className="winner-row" key={p.id || p.user_id}>
+            <div className="rank">{medal(win, idx)}</div>
+            <div className="avatar">{(p.name || '?')[0].toUpperCase()}</div>
+            <div className="grow">
+              {p.name}
+              {key(p.user_id) === key(uid) && <span className="dim"> (you)</span>}
+            </div>
+            <div className="away">{win >= 0 ? `${ord(win)} · ${score} pts` : `${score} pts`}</div>
+          </div>
+        ))}
+      </div>
+      <div className="spacer" />
+      <div className="toast">🍿 Thanks for playing — see you at the next watch party.</div>
     </div>
   )
 }

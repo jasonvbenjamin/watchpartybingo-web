@@ -22,7 +22,9 @@ export async function ensureSession() {
     if (error) throw error
   }
   // Best-effort: make sure a players row exists for this user (display_name etc).
-  await supabase.rpc('ensure_player').catch(() => {})
+  // NOTE: supabase.rpc() returns a thenable builder with NO .catch method in
+  // postgrest-js 2.x — calling .catch threw a TypeError that broke EVERY join.
+  try { await supabase.rpc('ensure_player') } catch { /* best-effort */ }
   const { data: { user } } = await supabase.auth.getUser()
   return user?.id ?? null
 }
@@ -100,7 +102,8 @@ export async function uploadSnap(gameId, userId, file, { squareIndex, tropeText,
 }
 
 export async function leaveGame(gameId) {
-  await supabase.rpc('leave_game', { p_game_id: gameId }).catch(() => {})
+  // rpc() builders are thenables without .catch — see ensureSession.
+  try { await supabase.rpc('leave_game', { p_game_id: gameId }) } catch { /* best-effort */ }
 }
 
 /** Subscribe to a game's live changes. Calls onGame(newGameRow) on any games
