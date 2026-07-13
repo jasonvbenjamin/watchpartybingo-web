@@ -377,7 +377,9 @@ function Celebration() {
 }
 
 /// The winner's full card — the room's proof, snapshotted by the server at the
-/// moment of the win and saved with the game. FREE center always reads marked.
+/// moment of the win and saved with the game. Rendered with the SAME .board/.cell
+/// styling as the live board (square aspect-ratio cells), so it keeps its bingo-card
+/// shape at any width — a real card on a phone, not a squished grid.
 function WinnerCardSheet({ winner, tropes, onClose }) {
   const markedSet = new Set([...(winner.marked || []), FREE_INDEX])
   return (
@@ -385,25 +387,15 @@ function WinnerCardSheet({ winner, tropes, onClose }) {
       <div className="sheet sheet-dark" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
         <button className="close" onClick={onClose}>✕</button>
         <h2>🏆 {winner.name}&apos;s winning card</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, marginTop: 12 }}>
+        <div className="board" style={{ marginTop: 14 }}>
           {(winner.card || []).map((tIdx, i) => {
             const free = i === FREE_INDEX
             const isMarked = markedSet.has(i)
             const trope = free ? null : tropes[tIdx]
             return (
-              <div key={i} style={{
-                borderRadius: 8,
-                padding: '6px 2px',
-                textAlign: 'center',
-                minHeight: 52,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                background: isMarked ? 'var(--accent)' : 'rgba(255,255,255,0.07)',
-                color: isMarked ? '#fff' : 'rgba(255,255,255,0.75)',
-              }}>
-                <div style={{ fontSize: 16, lineHeight: '18px' }}>{free ? '★' : trope?.emoji}</div>
-                <div style={{ fontSize: 8, fontWeight: 700, lineHeight: '10px', marginTop: 2 }}>
-                  {free ? 'FREE' : trope?.text}
-                </div>
+              <div key={i} className={`cell${isMarked ? ' marked' : ''}${free ? ' free' : ''}`}>
+                <span className="emoji">{free ? '★' : trope?.emoji}</span>
+                <span className="label">{free ? 'FREE' : trope?.text}</span>
               </div>
             )
           })}
