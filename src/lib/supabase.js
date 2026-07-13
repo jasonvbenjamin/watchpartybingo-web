@@ -58,6 +58,12 @@ export async function fetchPlayerStates(gameId) {
   return data ?? []
 }
 
+/** Publish our card once at game start (server keeps the first non-empty card,
+ *  immutable after) — lets anyone peek at it from the leaderboard. Best-effort. */
+export async function storeCard(gameId, card) {
+  try { await supabase.rpc('set_card', { p_game_id: gameId, p_card: card }) } catch { /* best-effort */ }
+}
+
 /** Persist the full intended marked set (array of cell indices 0..24). */
 export async function markSquare(gameId, marked) {
   const { data, error } = await supabase.rpc('mark_square', {

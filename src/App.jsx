@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ensureSession, joinGame, fetchGame, fetchPlayerStates,
+  ensureSession, joinGame, fetchGame, fetchPlayerStates, storeCard,
   markSquare, claimBingo, subscribeGame, recordSnap, recordRepeat, uploadSnap, joinWaitlist,
 } from './lib/supabase'
 import { buildCard, hasBingo, squaresAway, FREE_INDEX } from './lib/bingo'
@@ -104,7 +104,9 @@ export default function App() {
       setGame(g)
       // Wins that happened before we joined aren't "news" — don't replay them.
       seenWinners.current = new Set((g.winners || []).map((w) => (w.user_id || '').toLowerCase()))
-      setCard(buildCard(g.id, (g.custom_tropes || []).length || 25))
+      const myCard = ps.card?.length === 25 ? ps.card : buildCard(g.id, (g.custom_tropes || []).length || 25)
+      setCard(myCard)
+      storeCard(g.id, myCard) // publish once so others can peek from the leaderboard
       setPlayers(await fetchPlayerStates(g.id))
       session.current = subscribeGame(g.id, {
         onGame: (row) => setGame((prev) => ({ ...prev, ...row })),
@@ -164,6 +166,25 @@ export default function App() {
       ? { ...p, total: p.total + 3, snaps: p.snaps + 1, repeats: p.repeats + (already ? 1 : 0) }
       : { ...p, total: p.total + 1, dabs: p.dabs + 1, repeats: p.repeats + (already ? 1 : 0) })
     setSheet(null)
+  }
+
+  /// Peek at ANY player's card from the leaderboard. Card preference: winner
+  /// snapshot → server-published card (set_card) → local card (self). No card
+  /// available (older client) → quietly do nothing.
+  function openPlayerCard(p) {
+    const k = (s) => (s || '').toLowerCase()
+    const win = winners.find((w) => k(w.user_id) === k(p.user_id))
+    const isSelf = k(p.user_id) === k(uid)
+    const cardArr = (Array.isArray(win?.card) && win.card.length === 25) ? win.card
+      : (Array.isArray(p.card) && p.card.length === 25) ? p.card
+      : (isSelf && card.length === 25) ? card : null
+    if (!cardArr) return
+    const markedArr = win?.marked
+      || (isSelf ? [...marked].filter((x) => x !== FREE_INDEX) : (p.marked || []))
+    const away = squaresAway(new Set([...markedArr, FREE_INDEX]), pattern)
+    const subtitle = win ? 'got BINGO! — the winning card'
+      : away === 0 ? 'BINGO on the board!' : `current card — ${away} to go`
+    setViewWinner({ name: isSelf ? 'You' : p.name, card: cardArr, marked: markedArr, subtitle, emoji: win ? '🏆' : '👀' })
   }
 
   function share() {
@@ -311,7 +332,8 @@ export default function App() {
 
       {playersOpen && (
         <PlayersSheet players={players} pattern={pattern} uid={uid} myMarked={marked}
-          hostId={game?.host_id} winners={winners} onClose={() => setPlayersOpen(false)} />
+          hostId={game?.host_id} winners={winners} onClose={() => setPlayersOpen(false)}
+          onViewPlayer={(p) => { setPlayersOpen(false); openPlayerCard(p) }} />
       )}
 
       {viewWinner && (
@@ -323,10 +345,15 @@ export default function App() {
   )
 }
 
-function PlayersSheet({ players, pattern, uid, myMarked, hostId, winners, onClose }) {
+function PlayersSheet({ players, pattern, uid, myMarked, hostId, winners, onClose, onViewPlayer }) {
   const key = (s) => (s || '').toLowerCase()
   const winRank = (id) => winners.findIndex((w) => key(w.user_id) === key(id))
   const awayOf = (p) => squaresAway(key(p.user_id) === key(uid) ? [...myMarked] : (p.marked || []), pattern)
+  // A row is peekable when SOME 25-cell card exists for that player.
+  const peekable = (p, win) =>
+    (Array.isArray(winners[win]?.card) && winners[win].card.length === 25) ||
+    (Array.isArray(p.card) && p.card.length === 25) ||
+    key(p.user_id) === key(uid)
   const rows = players.map((p) => ({ p, away: awayOf(p), win: winRank(p.user_id), score: p.score ?? 0 }))
     .sort((a, b) => {
       if ((a.win >= 0) !== (b.win >= 0)) return a.win >= 0 ? -1 : 1
@@ -339,23 +366,29 @@ function PlayersSheet({ players, pattern, uid, myMarked, hostId, winners, onClos
       <div className="sheet sheet-dark" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
         <button className="close" onClick={onClose}>✕</button>
         <h2>Leaderboard ({players.length})</h2>
-        <div className="dim tiny" style={{ marginBottom: 12 }}>Most points first · closeness as tiebreak</div>
+        <div className="dim tiny" style={{ marginBottom: 12 }}>Most points first · tap a player to see their card</div>
         <div className="winner-list">
-          {rows.map(({ p, away, win, score }, idx) => (
-            <div className="winner-row" key={p.id || p.user_id}>
-              <div className="rank">{win >= 0 ? '🏆' : idx + 1}</div>
-              <div className="avatar">{(p.name || '?')[0].toUpperCase()}</div>
-              <div className="grow">
-                {p.name}
-                {key(p.user_id) === key(uid) && <span className="dim"> (you)</span>}
-                {key(p.user_id) === key(hostId) && <span className="tag-host" style={{ marginLeft: 8 }}>HOST</span>}
+          {rows.map(({ p, away, win, score }, idx) => {
+            const canPeek = !!onViewPlayer && peekable(p, win)
+            return (
+              <div className="winner-row" key={p.id || p.user_id}
+                style={canPeek ? { cursor: 'pointer' } : undefined}
+                onClick={canPeek ? () => onViewPlayer(p) : undefined}>
+                <div className="rank">{win >= 0 ? '🏆' : idx + 1}</div>
+                <div className="avatar">{(p.name || '?')[0].toUpperCase()}</div>
+                <div className="grow">
+                  {p.name}
+                  {key(p.user_id) === key(uid) && <span className="dim"> (you)</span>}
+                  {key(p.user_id) === key(hostId) && <span className="tag-host" style={{ marginLeft: 8 }}>HOST</span>}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="away">{win >= 0 ? (['1st', '2nd', '3rd'][win] || `${win + 1}th`) : `${score} pts`}</div>
+                  {win < 0 && <div className="dim" style={{ fontSize: 11 }}>{away === 0 ? 'BINGO' : `${away} away`}</div>}
+                </div>
+                {canPeek && <div className="dim" style={{ fontSize: 14, marginLeft: 6 }}>›</div>}
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div className="away">{win >= 0 ? (['1st', '2nd', '3rd'][win] || `${win + 1}th`) : `${score} pts`}</div>
-                {win < 0 && <div className="dim" style={{ fontSize: 11 }}>{away === 0 ? 'BINGO' : `${away} away`}</div>}
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
@@ -376,21 +409,21 @@ function Celebration() {
   )
 }
 
-/// The winner's full card — the room's proof, snapshotted by the server at the
-/// moment of the win and saved with the game. Presented CENTER SCREEN like a
-/// trophy: winner's name headlining the card. Rendered with the SAME
-/// .board/.cell styling as the live board (square aspect-ratio cells), so it
-/// keeps its bingo-card shape at any width.
+/// A player's full card, presented CENTER SCREEN. Winners get the trophy
+/// treatment (their {card, marked} snapshot frozen at the moment of the win);
+/// anyone else shows their live card + progress ("current card — N to go").
+/// Rendered with the SAME .board/.cell styling as the live board (square
+/// aspect-ratio cells), so it keeps its bingo-card shape at any width.
 function WinnerCardSheet({ winner, tropes, onClose }) {
   const markedSet = new Set([...(winner.marked || []), FREE_INDEX])
   return (
     <div className="modal-scrim" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <button className="close" onClick={onClose}>✕</button>
-        <div style={{ textAlign: 'center', fontSize: 40, lineHeight: '44px' }}>🏆</div>
+        <div style={{ textAlign: 'center', fontSize: 40, lineHeight: '44px' }}>{winner.emoji || '🏆'}</div>
         <h2 style={{ textAlign: 'center', margin: '6px 0 0', fontSize: 26, fontWeight: 800 }}>{winner.name}</h2>
         <div className="dim" style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, margin: '2px 0 14px' }}>
-          got BINGO! — the winning card
+          {winner.subtitle || 'got BINGO! — the winning card'}
         </div>
         <div className="board">
           {(winner.card || []).map((tIdx, i) => {
