@@ -114,6 +114,14 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 .away { font-size: 13px; font-weight: 800; color: var(--accent); }
 .tag-host { font-size: 10px; font-weight: 800; color: #1a1206; background: var(--accent); padding: 2px 7px; border-radius: 999px; }
 
+/* Centered modal — the trophy-presentation surface (winner card) */
+.modal-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.68); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 18px; }
+.modal-card { width: 100%; max-width: 420px; background: #16161f; color: #fff; border-radius: 26px;
+  border: 1px solid rgba(255,255,255,0.09); padding: 22px 18px; position: relative; animation: pop-in .18s ease-out; }
+@keyframes pop-in { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.modal-card .close { position: absolute; right: 14px; top: 14px; width: 34px; height: 34px; border-radius: 50%;
+  border: none; background: rgba(255,255,255,0.1); color: #fff; font-size: 17px; }
+
 /* Bottom sheet */
 .sheet-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: flex-end; justify-content: center; z-index: 50; }
 .sheet { width: 100%; max-width: 560px; background: #fff; color: #14141c; border-radius: 26px 26px 0 0;

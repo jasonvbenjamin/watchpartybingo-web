@@ -377,17 +377,22 @@ function Celebration() {
 }
 
 /// The winner's full card — the room's proof, snapshotted by the server at the
-/// moment of the win and saved with the game. Rendered with the SAME .board/.cell
-/// styling as the live board (square aspect-ratio cells), so it keeps its bingo-card
-/// shape at any width — a real card on a phone, not a squished grid.
+/// moment of the win and saved with the game. Presented CENTER SCREEN like a
+/// trophy: winner's name headlining the card. Rendered with the SAME
+/// .board/.cell styling as the live board (square aspect-ratio cells), so it
+/// keeps its bingo-card shape at any width.
 function WinnerCardSheet({ winner, tropes, onClose }) {
   const markedSet = new Set([...(winner.marked || []), FREE_INDEX])
   return (
-    <div className="sheet-scrim" onClick={onClose}>
-      <div className="sheet sheet-dark" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+    <div className="modal-scrim" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <button className="close" onClick={onClose}>✕</button>
-        <h2>🏆 {winner.name}&apos;s winning card</h2>
-        <div className="board" style={{ marginTop: 14 }}>
+        <div style={{ textAlign: 'center', fontSize: 40, lineHeight: '44px' }}>🏆</div>
+        <h2 style={{ textAlign: 'center', margin: '6px 0 0', fontSize: 26, fontWeight: 800 }}>{winner.name}</h2>
+        <div className="dim" style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, margin: '2px 0 14px' }}>
+          got BINGO! — the winning card
+        </div>
+        <div className="board">
           {(winner.card || []).map((tIdx, i) => {
             const free = i === FREE_INDEX
             const isMarked = markedSet.has(i)
