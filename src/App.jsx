@@ -37,6 +37,8 @@ export default function App() {
   const [statsOpen, setStatsOpen] = useState(false)
   const [won, setWon] = useState(false)
   const [playersOpen, setPlayersOpen] = useState(false)
+  const [viewWinner, setViewWinner] = useState(null)   // winner entry whose card is on screen
+  const seenWinners = useRef(null)                     // seeded at join; auto-show fires once per NEW win
   const [pulses, setPulses] = useState([])
   const [liveOn, setLiveOn] = useState(() => localStorage.getItem('wpb-live') !== '0')
   const session = useRef(null)
@@ -75,6 +77,21 @@ export default function App() {
   // response) — `won` drives the chime + confetti exactly once.
   useEffect(() => { if (iWon) setWon(true) }, [iWon])
 
+  // The winning-card moment: when someone ELSE bingos, show the room their
+  // full card (the winner has their own confetti). Once per win, never replayed.
+  useEffect(() => {
+    if (!seenWinners.current) return
+    for (const w of winners) {
+      const key = (w.user_id || '').toLowerCase()
+      if (seenWinners.current.has(key)) continue
+      seenWinners.current.add(key)
+      if (key !== (uid || '').toLowerCase() && Array.isArray(w.card) && w.card.length === 25) {
+        setViewWinner(w)
+        buzz([0, 60, 40, 60])
+      }
+    }
+  }, [winners, uid])
+
   async function handleJoin() {
     if (!code.trim() || !name.trim()) return
     setBusy(true); setError('')
@@ -85,6 +102,8 @@ export default function App() {
       const ps = await joinGame(code.trim().toUpperCase(), name.trim(), [])
       const g = await fetchGame(ps.game_id)
       setGame(g)
+      // Wins that happened before we joined aren't "news" — don't replay them.
+      seenWinners.current = new Set((g.winners || []).map((w) => (w.user_id || '').toLowerCase()))
       setCard(buildCard(g.id, (g.custom_tropes || []).length || 25))
       setPlayers(await fetchPlayerStates(g.id))
       session.current = subscribeGame(g.id, {
@@ -121,7 +140,9 @@ export default function App() {
 
   async function doClaim() {
     try {
-      const res = await claimBingo(game.id)
+      // Send the card: the server snapshots {card, marked} into the winners
+      // entry so the whole room sees the winning card (saved with the game).
+      const res = await claimBingo(game.id, card.length === 25 ? card : null)
       if (res?.status === 'won') setWon(true)
     } catch { /* server rejects a non-win; ignore */ }
   }
@@ -224,7 +245,8 @@ export default function App() {
         </div>
       )}
       {!iWon && winners.length > 0 && !finished && (
-        <div className="win-banner" style={{ background: 'rgba(255,255,255,0.06)', color: '#fff' }}>
+        <div className="win-banner" style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', cursor: 'pointer' }}
+          onClick={() => { const w = winners.find((x) => Array.isArray(x.card)); if (w) setViewWinner(w) }}>
           🏆 {winners[0]?.name} got bingo{winners.length > 1 ? ` +${winners.length - 1} more` : ''} — still anyone&apos;s game for 2nd!
         </div>
       )}
@@ -235,7 +257,8 @@ export default function App() {
       )}
 
       {finished ? (
-        <GameOver players={players} winners={winners} pattern={pattern} uid={uid} watching={game?.watching} />
+        <GameOver players={players} winners={winners} pattern={pattern} uid={uid} watching={game?.watching}
+          onViewWinner={setViewWinner} />
       ) : !playing ? (
         <Lobby game={game} players={players} pattern={pattern} share={share} />
       ) : (
@@ -289,6 +312,10 @@ export default function App() {
       {playersOpen && (
         <PlayersSheet players={players} pattern={pattern} uid={uid} myMarked={marked}
           hostId={game?.host_id} winners={winners} onClose={() => setPlayersOpen(false)} />
+      )}
+
+      {viewWinner && (
+        <WinnerCardSheet winner={viewWinner} tropes={tropes} onClose={() => setViewWinner(null)} />
       )}
 
       {won && <Celebration />}
@@ -349,9 +376,47 @@ function Celebration() {
   )
 }
 
+/// The winner's full card — the room's proof, snapshotted by the server at the
+/// moment of the win and saved with the game. FREE center always reads marked.
+function WinnerCardSheet({ winner, tropes, onClose }) {
+  const markedSet = new Set([...(winner.marked || []), FREE_INDEX])
+  return (
+    <div className="sheet-scrim" onClick={onClose}>
+      <div className="sheet sheet-dark" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+        <button className="close" onClick={onClose}>✕</button>
+        <h2>🏆 {winner.name}&apos;s winning card</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, marginTop: 12 }}>
+          {(winner.card || []).map((tIdx, i) => {
+            const free = i === FREE_INDEX
+            const isMarked = markedSet.has(i)
+            const trope = free ? null : tropes[tIdx]
+            return (
+              <div key={i} style={{
+                borderRadius: 8,
+                padding: '6px 2px',
+                textAlign: 'center',
+                minHeight: 52,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                background: isMarked ? 'var(--accent)' : 'rgba(255,255,255,0.07)',
+                color: isMarked ? '#fff' : 'rgba(255,255,255,0.75)',
+              }}>
+                <div style={{ fontSize: 16, lineHeight: '18px' }}>{free ? '★' : trope?.emoji}</div>
+                <div style={{ fontSize: 8, fontWeight: 700, lineHeight: '10px', marginTop: 2 }}>
+                  {free ? 'FREE' : trope?.text}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /// The wrap-up screen — a finished game shows closing credits, not a fake lobby.
-/// Standings: bingo order first (claim order = rank), then points.
-function GameOver({ players, winners, pattern, uid, watching }) {
+/// Standings: bingo order first (claim order = rank), then points. Winner rows
+/// with a card snapshot open the winning card.
+function GameOver({ players, winners, pattern, uid, watching, onViewWinner }) {
   const key = (s) => (s || '').toLowerCase()
   const winRank = (id) => winners.findIndex((w) => key(w.user_id) === key(id))
   const rows = players
@@ -378,17 +443,24 @@ function GameOver({ players, winners, pattern, uid, watching }) {
       <div style={{ height: 16 }} />
       <div className="dim tiny" style={{ marginBottom: 8 }}>Final standings</div>
       <div className="winner-list">
-        {rows.map(({ p, win, score }, idx) => (
-          <div className="winner-row" key={p.id || p.user_id}>
-            <div className="rank">{medal(win, idx)}</div>
-            <div className="avatar">{(p.name || '?')[0].toUpperCase()}</div>
-            <div className="grow">
-              {p.name}
-              {key(p.user_id) === key(uid) && <span className="dim"> (you)</span>}
+        {rows.map(({ p, win, score }, idx) => {
+          const entry = win >= 0 ? winners[win] : null
+          const hasCard = Array.isArray(entry?.card) && entry.card.length === 25
+          return (
+            <div className="winner-row" key={p.id || p.user_id}
+              style={hasCard ? { cursor: 'pointer' } : undefined}
+              onClick={hasCard ? () => onViewWinner?.(entry) : undefined}>
+              <div className="rank">{medal(win, idx)}</div>
+              <div className="avatar">{(p.name || '?')[0].toUpperCase()}</div>
+              <div className="grow">
+                {p.name}
+                {key(p.user_id) === key(uid) && <span className="dim"> (you)</span>}
+                {hasCard && <span className="dim tiny"> · view card</span>}
+              </div>
+              <div className="away">{win >= 0 ? `${ord(win)} · ${score} pts` : `${score} pts`}</div>
             </div>
-            <div className="away">{win >= 0 ? `${ord(win)} · ${score} pts` : `${score} pts`}</div>
-          </div>
-        ))}
+          )
+        })}
       </div>
       <div className="spacer" />
       <div className="toast">🍿 Thanks for playing — see you at the next watch party.</div>

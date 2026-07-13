@@ -67,9 +67,11 @@ export async function markSquare(gameId, marked) {
   return data
 }
 
-/** Client detects a likely bingo; server recomputes + decides (.won/.pending). */
-export async function claimBingo(gameId) {
-  const { data, error } = await supabase.rpc('claim_bingo', { p_game_id: gameId })
+/** Client detects a likely bingo; server recomputes + decides (.won/.pending).
+ *  `card` (25 trope indices) gets snapshotted into the winners entry so the
+ *  whole room can be shown the winning card — and it's saved with the game. */
+export async function claimBingo(gameId, card = null) {
+  const { data, error } = await supabase.rpc('claim_bingo', { p_game_id: gameId, p_card: card })
   if (error) throw error
   return data
 }
