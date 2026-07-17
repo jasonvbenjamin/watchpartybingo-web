@@ -444,7 +444,7 @@ export default function App() {
 
       {iWon && !finished && (
         <div className="win-banner">
-          🎉 BINGO! You won{rankSuffix(winners, uid)}. Keep dabbing — the show&apos;s not over!
+          🎉 BINGO!{rankSuffix(winners, uid)} — that place is locked 🔒. Kick back, the show&apos;s not over!
         </div>
       )}
       {!iWon && winners.length > 0 && !finished && (
@@ -539,24 +539,14 @@ function PlayersSheet({ players, pattern, uid, myMarked, hostId, winners, onClos
     (Array.isArray(winners[win]?.card) && winners[win].card.length === 25) ||
     (Array.isArray(p.card) && p.card.length === 25) ||
     key(p.user_id) === key(uid)
-  // Points decide the order — a bingo is an AWARD, not a throne. This header has
-  // said "Most points first" the whole time while the sort floated every winner
-  // above every non-winner, so a 5-point bingo outranked a 60-point grinder and
-  // repeats (which score, uncapped) could never move the top of the list. The 🏆
-  // still marks whoever bingoed; claim order is now only the tiebreak.
   const rows = players.map((p) => ({ p, away: awayOf(p), win: winRank(p.user_id), score: p.score ?? 0 }))
-    .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score
-      if ((a.win >= 0) !== (b.win >= 0)) return a.win >= 0 ? -1 : 1
-      if (a.win >= 0 && b.win >= 0) return a.win - b.win
-      return a.away - b.away
-    })
+    .sort(compareStandings)
   return (
     <div className="sheet-scrim" onClick={onClose}>
       <div className="sheet sheet-dark" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
         <button className="close" onClick={onClose}>✕</button>
         <h2>Leaderboard ({players.length})</h2>
-        <div className="dim tiny" style={{ marginBottom: 12 }}>Most points first · tap a player to see their card</div>
+        <div className="dim tiny" style={{ marginBottom: 12 }}>First to bingo wins · then points · tap a player to see their card</div>
         <div className="winner-list">
           {rows.map(({ p, away, win, score }, idx) => {
             const canPeek = !!onViewPlayer && peekable(p, win)
@@ -634,8 +624,9 @@ function WinnerCardSheet({ winner, tropes, onClose }) {
 }
 
 /// The wrap-up screen — a finished game shows closing credits, not a fake lobby.
-/// Standings: most points first; a bingo is an award (🏆) and the tiebreak, not a
-/// throne. Winner rows with a card snapshot open the winning card.
+/// Standings: get bingo and you win (🏆 first to bingo = 1st), points rank the
+/// rest and decide a no-bingo night. Winner rows with a card snapshot open the
+/// winning card.
 function GameOver({ gameId, players, winners, pattern, uid, watching, onViewWinner }) {
   const key = (s) => (s || '').toLowerCase()
   const winRank = (id) => winners.findIndex((w) => key(w.user_id) === key(id))
@@ -660,15 +651,9 @@ function GameOver({ gameId, players, winners, pattern, uid, watching, onViewWinn
   }, [gameId])
   const rows = players
     .map((p) => ({ p, win: winRank(p.user_id), score: p.score ?? 0, away: squaresAway(p.marked || [], pattern) }))
-    .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score
-      if ((a.win >= 0) !== (b.win >= 0)) return a.win >= 0 ? -1 : 1
-      if (a.win >= 0 && b.win >= 0) return a.win - b.win
-      return a.away - b.away
-    })
-  // The rank column means ONE thing: your position on points, which is what the
-  // row order now is. The bingo is an award and rides on the right, so a trophy
-  // can't sit at position 4 pretending to be the rank.
+    .sort(compareStandings)
+  // The rank column is your finishing position — bingo order at the top, then the
+  // points crowd. The 🏆 rides on the right so the column never lies.
   const ord = (n) => ['1st', '2nd', '3rd'][n] || `${n + 1}th`
   return (
     <div className="wrap">
@@ -838,6 +823,21 @@ function rankSuffix(winners, uid) {
 function prettyPattern(p) {
   return { line: 'Line', four_corners: 'Four Corners', x_pattern: 'X', blackout: 'Blackout' }[p] || 'Line'
 }
+/// THE RANKING RULE, shared by the live leaderboard and the wrap-up standings so
+/// they can't drift. Get bingo and you win: winners rank first by claim order
+/// (first to bingo = 1st), and a bingo beats ANY point total. Points rank everyone
+/// who didn't bingo, and decide the whole game on a no-bingo night. Mirrors iOS
+/// LeaderboardEntry.ranks. Rows are { win, score, away } — win is the 0-based
+/// claim order or -1 for no bingo.
+function compareStandings(a, b) {
+  const aWon = a.win >= 0
+  const bWon = b.win >= 0
+  if (aWon !== bWon) return aWon ? -1 : 1       // bingo tier beats non-bingo
+  if (aWon && bWon) return a.win - b.win        // both bingoed → first to bingo wins
+  if (b.score !== a.score) return b.score - a.score  // neither → most points
+  return a.away - b.away                        // then closer to bingo
+}
+
 function humanize(e) {
   const m = (e?.message || '').toLowerCase()
   if (m.includes('recursion')) return 'Server hiccup — try again in a sec.'
