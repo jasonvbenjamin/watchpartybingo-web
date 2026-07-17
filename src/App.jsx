@@ -7,6 +7,19 @@ import { buildCard, hasBingo, squaresAway, FREE_INDEX } from './lib/bingo'
 import { themeVars } from './lib/theme'
 
 const NAME_KEY = 'wpb-player-name'
+const LAST_KEY = 'wpb-last-game'
+/// A game is a NIGHT, not an account. We remember the code you're playing so a
+/// reload drops you back at the join screen with it filled in instead of on the
+/// marketing page — but only for the length of an evening. Come back on Saturday
+/// and you get the front door, like anyone else.
+const LAST_TTL_MS = 12 * 60 * 60 * 1000
+
+function readLastCode() {
+  try {
+    const { code, ts } = JSON.parse(localStorage.getItem(LAST_KEY) || '{}')
+    return code && Date.now() - ts < LAST_TTL_MS ? code : ''
+  } catch { return '' }
+}
 
 export default function App() {
   const urlCode = useMemo(() => {
@@ -16,9 +29,11 @@ export default function App() {
     const path = decodeURIComponent((location.pathname.split('/join/')[1] || '').split('/')[0])
     return (q || path).trim().toUpperCase()
   }, [])
+  // An explicit invite link always wins over the remembered one.
+  const resumeCode = useMemo(() => urlCode || readLastCode(), [urlCode])
 
-  const [phase, setPhase] = useState(urlCode ? 'name' : 'landing')  // landing | name | live
-  const [code, setCode] = useState(urlCode)
+  const [phase, setPhase] = useState(resumeCode ? 'name' : 'landing')  // landing | name | live
+  const [code, setCode] = useState(resumeCode)
   const [name, setName] = useState(localStorage.getItem(NAME_KEY) || '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -28,6 +43,14 @@ export default function App() {
   const [players, setPlayers] = useState([])
   const [card, setCard] = useState([])
   const [marked, setMarked] = useState(new Set([FREE_INDEX]))
+  /// Per-square dab counts {index: n} — the "3×" badge and the hot glow, which
+  /// iOS has had and web never rendered, though `.cell .badge` has been styled
+  /// this whole time. Repeats are the point engine; without this the tap that
+  /// scores looks identical to a tap that does nothing, so guests stop doing it.
+  /// LOCAL BY NECESSITY, exactly as on iOS: the server keeps extra_taps as one
+  /// scalar and can't say WHICH square a repeat hit, so a rejoin seeds each
+  /// marked square to 1 — loses the breakdown rather than inventing one.
+  const [taps, setTaps] = useState({})
   const [pts, setPts] = useState({ total: 0, dabs: 0, snaps: 0, repeats: 0 })
 
   const [sheet, setSheet] = useState(null)            // tapped cell index
@@ -129,7 +152,9 @@ export default function App() {
       const id = await ensureSession()
       setUid(id)
       localStorage.setItem(NAME_KEY, name.trim())
-      const ps = await joinGame(code.trim().toUpperCase(), name.trim(), [])
+      const joinCode = code.trim().toUpperCase()
+      const ps = await joinGame(joinCode, name.trim(), [])
+      localStorage.setItem(LAST_KEY, JSON.stringify({ code: joinCode, ts: Date.now() }))
       const g = await fetchGame(ps.game_id)
       setGame(g)
       // Wins that happened before we joined aren't "news" — don't replay them.
@@ -137,6 +162,13 @@ export default function App() {
       const myCard = ps.card?.length === 25 ? ps.card : buildCard(g.id, (g.custom_tropes || []).length || 25)
       setCard(myCard)
       storeCard(g.id, myCard) // publish once so others can peek from the leaderboard
+      // Rejoining (a reload, a dropped tab) must restore the board we already
+      // have. join_game returns the EXISTING player_states row, marked and all —
+      // reading only ps.card and leaving `marked` at its initial {FREE} meant the
+      // next dab flushed that empty set straight over the server's copy via
+      // `set marked = p_marked`. An hour of dabbing, gone, mid-movie.
+      setMarked(new Set([FREE_INDEX, ...(ps.marked || [])]))
+      setTaps(Object.fromEntries((ps.marked || []).map((i) => [i, 1])))
       setPlayers(await fetchPlayerStates(g.id))
       session.current = subscribeGame(g.id, {
         onGame: (row) => setGame((prev) => ({ ...prev, ...row })),
@@ -188,6 +220,9 @@ export default function App() {
       if (!already) { next.add(i); persistMark(next) }
       return next
     })
+    // A snap proves the square happened but isn't a repeat — the server counts
+    // photos separately, so it seeds the square at 1 and never bumps the badge.
+    setTaps((prev) => ({ ...prev, [i]: kind === 'snap' ? Math.max(1, prev[i] || 0) : (prev[i] || 0) + 1 }))
     if (!game?.preview) {
       if (kind === 'snap') recordSnap(game.id).catch(() => {})
       else if (already) recordRepeat(game.id).catch(() => {})
@@ -217,10 +252,33 @@ export default function App() {
     setViewWinner({ name: isSelf ? 'You' : p.name, card: cardArr, marked: markedArr, subtitle, emoji: win ? '🏆' : '👀' })
   }
 
-  function share() {
+  /// A brief toast in the pulse stack. Same surface the live activity uses, so
+  /// there's exactly one place transient messages appear.
+  function toast(msg) {
+    const id = ++pulseSeq.current
+    setPulses((p) => [...p.slice(-2), { id, msg }])
+    setTimeout(() => setPulses((p) => p.filter((x) => x.id !== id)), 2600)
+  }
+
+  async function share() {
     const link = `${location.origin}${import.meta.env.BASE_URL}join/${game.code}`
-    if (navigator.share) navigator.share({ title: 'Watch Party Bingo', text: `Join my game — code ${game.code}`, url: link }).catch(() => {})
-    else navigator.clipboard?.writeText(game.code)
+    const show = game.watching ? ` — we're watching ${game.watching}` : ''
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Watch Party Bingo', text: `Join my game${show}`, url: link })
+      } catch { /* the user dismissed the sheet; not an error */ }
+      return
+    }
+    // Desktop has no navigator.share, and this used to copy game.code — so the
+    // laptop host handed out a code and made six people go find the site and
+    // type it. Copy the LINK, and say so: a button that looks inert gets pressed
+    // again, and nobody can see a clipboard.
+    try {
+      await navigator.clipboard.writeText(link)
+      toast('🔗 Invite link copied')
+    } catch {
+      toast(`Code: ${game.code}`)
+    }
   }
 
   // A teammate just marked a square — show a brief, opt-out-able activity toast.
@@ -321,9 +379,12 @@ export default function App() {
               const free = i === FREE_INDEX
               const isMarked = marked.has(i)
               const trope = free ? null : tropes[tIdx]
+              // Same thresholds as iOS TileView: badge above 1, hot at 3.
+              const n = free ? 0 : (taps[i] || 0)
               return (
-                <button key={i} className={`cell${isMarked ? ' marked' : ''}${free ? ' free' : ''}`}
+                <button key={i} className={`cell${isMarked ? ' marked' : ''}${free ? ' free' : ''}${n >= 3 ? ' hot' : ''}`}
                   onClick={() => { if (!free && playing) setSheet(i) }}>
+                  {n > 1 && <span className="badge">{n}×</span>}
                   {free ? <><span className="emoji">★</span><span className="label">FREE</span></>
                     : <><span className="emoji">{trope?.emoji}</span><span className="label">{trope?.text}</span></>}
                 </button>

@@ -98,6 +98,11 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 .cell.free .emoji { color: #f59e0b; }
 .cell.free .label { color: #b8730a; }
 .cell .badge { position: absolute; top: 3px; right: 5px; font-size: 9px; font-weight: 900; color: inherit; opacity: 0.85; }
+/* A square you keep dabbing is the joke of the night ("that's the FOURTH time
+   he's said it"). At 3+ it earns a ring — same threshold as the iOS tile, so
+   the two surfaces are the same game. Ring only: no glow to fight the room. */
+.cell.hot { box-shadow: 0 0 0 2px var(--brand-b), 0 0 10px rgba(248,52,255,0.35); }
+.cell.hot .badge { opacity: 1; }
 
 .footer-cta { display: flex; justify-content: center; padding: 14px; }
 .wordmark-foot { text-align: center; padding: 12px; color: #fff; font-weight: 800; opacity: 0.9; }
