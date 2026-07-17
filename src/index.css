@@ -71,8 +71,10 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 .icon-btn { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,0.06);
   border: 1px solid var(--hairline); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; }
 .title { text-align: center; }
-.title .sub { font-size: 11px; color: var(--text-dim); display: flex; align-items: center; justify-content: center; gap: 4px; }
+.title .sub { font-size: 11px; color: var(--text-dim); display: flex; align-items: center; justify-content: center; gap: 8px; }
 .title .name { font-weight: 800; font-size: 17px; }
+/* Your score, glanceable. Tabular so it doesn't jitter as it climbs. */
+.score-chip { font-size: 12px; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
 .code-pill { color: var(--accent); font-weight: 800; font-size: 13px; letter-spacing: 0.06em; background: none; border: none; }
 .people { justify-self: end; display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 12px;
   background: rgba(255,255,255,0.06); border: 1px solid var(--hairline); color: #fff; font-weight: 700; font-size: 14px; }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ensureSession, joinGame, fetchGame, fetchFinishedGameByCode, fetchPlayerStates, storeCard,
+  ensureSession, joinGame, leaveGame, fetchGame, fetchFinishedGameByCode, fetchPlayerStates, storeCard,
   markSquare, claimBingo, subscribeGame, recordSnap, recordRepeat, uploadSnap, joinWaitlist,
 } from './lib/supabase'
 import { buildCard, hasBingo, squaresAway, FREE_INDEX } from './lib/bingo'
@@ -51,7 +51,14 @@ export default function App() {
   /// scalar and can't say WHICH square a repeat hit, so a rejoin seeds each
   /// marked square to 1 — loses the breakdown rather than inventing one.
   const [taps, setTaps] = useState({})
-  const [pts, setPts] = useState({ total: 0, dabs: 0, snaps: 0, repeats: 0 })
+  /// Photos taken this game. Seeded from the server on join so a reload doesn't
+  /// forget them, and the only part of the local score that isn't derivable from
+  /// the board itself.
+  const [photoCount, setPhotoCount] = useState(0)
+  /// Realtime channel health. subscribeGame has always ACCEPTED an onStatus
+  /// callback and nothing ever passed one, so a dropped channel was silent on
+  /// both ends — see the safety-net poll below for why that mattered.
+  const [conn, setConn] = useState('CONNECTING')
 
   const [sheet, setSheet] = useState(null)            // tapped cell index
   const [snaps, setSnaps] = useState([])              // local My Snaps gallery
@@ -94,8 +101,53 @@ export default function App() {
     .some((w) => (w.user_id || '').toLowerCase() === (uid || '').toLowerCase())
   const oneAway = playing && !iWon && !won && myAway === 1
   const me = players.find((p) => (p.user_id || '').toLowerCase() === (uid || '').toLowerCase())
+
+  /// The local score, DERIVED from the board with the server's own formula:
+  ///   content squares (excl. FREE) + photos × 2 + extra taps
+  ///
+  /// It used to be an accumulator — `total + 3` on any snap and `+1` on any dab,
+  /// counting a repeat as both a dab AND a repeat, and paying a snap 3 where the
+  /// server pays 2 on an already-marked square. Three separate ways to drift from
+  /// the number everyone else could see. Deriving it makes drift impossible; it's
+  /// still only a fallback, because `me.score` from the server always wins.
+  const localPts = useMemo(() => {
+    const dabs = [...marked].filter((x) => x !== FREE_INDEX).length
+    const repeats = Object.values(taps).reduce((sum, n) => sum + Math.max(0, n - 1), 0)
+    return { total: dabs + photoCount * 2 + repeats, dabs, snaps: photoCount, repeats }
+  }, [marked, taps, photoCount])
+  /// What the room sees. The server recomputes on every mark/snap/repeat, so this
+  /// is the same number as the leaderboard — never a second opinion.
+  const myScore = me?.score ?? localPts.total
   liveOnRef.current = liveOn
   useEffect(() => { if (oneAway) buzz(25) }, [oneAway])
+
+  // Safety net for the worst seat in the house.
+  //
+  // `game.status` could only ever advance through the realtime socket: fetchGame
+  // ran once, at join. So one dropped channel on crowded apartment wifi — which
+  // is every apartment on game night — left that guest reading "Waiting for the
+  // host to start…" while the room laughed without them. Silent on both ends:
+  // the host sees them in the roster, they see a lobby that never opens.
+  //
+  // Deliberately NOT a general poll. It runs only while we're waiting for the
+  // game to move or the channel is unhealthy, and stops dead during live play —
+  // the socket is better than polling when it works, and a refetch storm mid-game
+  // is its own bug.
+  useEffect(() => {
+    if (phase !== 'live' || !game?.id || game.preview) return
+    const healthy = conn === 'SUBSCRIBED'
+    const settled = game.status === 'finished'
+    if (settled || (healthy && game.status === 'playing')) return
+    const id = setInterval(async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const fresh = await fetchGame(game.id)
+        setGame((prev) => ({ ...prev, ...fresh }))
+        if (fresh.status !== 'waiting') setPlayers(await fetchPlayerStates(game.id))
+      } catch { /* offline; the next tick tries again */ }
+    }, 5000)
+    return () => clearInterval(id)
+  }, [phase, game?.id, game?.status, game?.preview, conn])
 
   // Hold the screen on while the game is live. You dab a square, then watch the
   // movie for ten minutes — phone auto-lock would black the board out between
@@ -169,6 +221,7 @@ export default function App() {
       // `set marked = p_marked`. An hour of dabbing, gone, mid-movie.
       setMarked(new Set([FREE_INDEX, ...(ps.marked || [])]))
       setTaps(Object.fromEntries((ps.marked || []).map((i) => [i, 1])))
+      setPhotoCount(ps.photos_taken || 0)
       setPlayers(await fetchPlayerStates(g.id))
       session.current = subscribeGame(g.id, {
         onGame: (row) => setGame((prev) => ({ ...prev, ...row })),
@@ -188,6 +241,7 @@ export default function App() {
           })
         },
         onPulse: (pl) => showPulse(pl),
+        onStatus: (status) => setConn(status),
       })
       setPhase('live')
     } catch (e) {
@@ -243,9 +297,7 @@ export default function App() {
       if (kind === 'snap') recordSnap(game.id).catch(() => {})
       else if (already) recordRepeat(game.id).catch(() => {})
     }
-    setPts((p) => kind === 'snap'
-      ? { ...p, total: p.total + 3, snaps: p.snaps + 1, repeats: p.repeats + (already ? 1 : 0) }
-      : { ...p, total: p.total + 1, dabs: p.dabs + 1, repeats: p.repeats + (already ? 1 : 0) })
+    if (kind === 'snap') setPhotoCount((n) => n + 1)
     setSheet(null)
   }
 
@@ -274,6 +326,18 @@ export default function App() {
     const id = ++pulseSeq.current
     setPulses((p) => [...p.slice(-2), { id, msg }])
     setTimeout(() => setPulses((p) => p.filter((x) => x.id !== id)), 2600)
+  }
+
+  /// Leaving is a real action with a real consequence for the room, so it says so
+  /// and then actually tells the server. A finished game is already over — no
+  /// seat to give up, no need to ask.
+  async function handleHome() {
+    if (game?.preview || finished) { location.href = import.meta.env.BASE_URL; return }
+    if (!confirm('Leave this game? Your card is gone if you do.')) return
+    session.current?.stop?.()
+    localStorage.removeItem(LAST_KEY)   // don't resume a game we just walked out of
+    if (game?.id) await leaveGame(game.id)
+    location.href = import.meta.env.BASE_URL
   }
 
   async function share() {
@@ -355,11 +419,24 @@ export default function App() {
   return (
     <div className="game" style={themeVars(game?.theme)}>
       <div className="topbar">
-        <button className="icon-btn" onClick={() => location.reload()} aria-label="Home">⌂</button>
+        {/* `leaveGame` has been exported and never imported; Home was a bare
+            location.reload(), so a guest who tapped it stayed in the roster
+            forever as a ghost the host could never account for. Ask first —
+            mid-game this is one tap from losing your card. */}
+        <button className="icon-btn" onClick={handleHome} aria-label="Leave game">⌂</button>
+        {/* The sub-line used to pipe game.watching into BOTH rows, so the header
+            read "NBA Games / NBA Games" — or "Watch Party Bingo / Bingo" with
+            nothing attached. Say the show once; spend the other line on the score,
+            which is the number that decides the night and until now only existed
+            behind a button in a sheet. A number ticking in the corner of your eye
+            is how the point engine exists without asking anyone to stare at their
+            phone — and it's the SERVER's number, the same one the room sees. */}
         <div className="title">
-          <div className="sub">{game?.watching || 'Watch Party Bingo'}</div>
-          <div className="name">{game?.watching || 'Bingo'}</div>
-          <button className="code-pill" onClick={share}>#{game?.code} ⤴</button>
+          <div className="name">{game?.watching || 'Watch Party Bingo'}</div>
+          <div className="sub">
+            {playing && <span className="score-chip">⭐ {myScore}</span>}
+            <button className="code-pill" onClick={share}>#{game?.code} ⤴</button>
+          </div>
         </div>
         <button className="people" onClick={() => setPlayersOpen((o) => !o)} aria-label="Show players">👥 {players.length || 1}</button>
       </div>
@@ -433,7 +510,7 @@ export default function App() {
       )}
 
       {statsOpen && (
-        <StatsSheet pts={pts} away={myAway} marked={marked} me={me} snaps={snaps} liveOn={liveOn}
+        <StatsSheet pts={localPts} away={myAway} marked={marked} me={me} snaps={snaps} liveOn={liveOn}
           onToggleLive={() => setLiveOn((v) => !v)} onClose={() => setStatsOpen(false)} />
       )}
 
