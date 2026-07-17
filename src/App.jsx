@@ -73,6 +73,36 @@ export default function App() {
   const me = players.find((p) => (p.user_id || '').toLowerCase() === (uid || '').toLowerCase())
   liveOnRef.current = liveOn
   useEffect(() => { if (oneAway) buzz(25) }, [oneAway])
+
+  // Hold the screen on while the game is live. You dab a square, then watch the
+  // movie for ten minutes — phone auto-lock would black the board out between
+  // every dab. Only a PLAYING game holds the lock; it drops on finish/unmount so
+  // a forgotten tab can't sit there burning battery. Best-effort: the API is
+  // unsupported on some browsers (notably iOS Safari before 16.4) and the request
+  // rejects whenever the tab isn't visible — neither is an error worth surfacing,
+  // the game just plays as it does today.
+  useEffect(() => {
+    if (!playing || !('wakeLock' in navigator)) return
+    let sentinel = null
+    let released = false
+    const acquire = async () => {
+      if (released || document.visibilityState !== 'visible') return
+      try {
+        sentinel = await navigator.wakeLock.request('screen')
+        // The browser drops the lock on its own when the tab is hidden; take it
+        // back on return rather than leaving the rest of the movie unprotected.
+        sentinel.addEventListener('release', () => { sentinel = null })
+      } catch { /* denied, unsupported, or hidden — play on without it */ }
+    }
+    const onVisible = () => { if (document.visibilityState === 'visible' && !sentinel) acquire() }
+    acquire()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      released = true
+      document.removeEventListener('visibilitychange', onVisible)
+      sentinel?.release?.().catch(() => {})
+    }
+  }, [playing])
   // Celebrate on the server's word too (host-approved claims, or a lost claim
   // response) — `won` drives the chime + confetti exactly once.
   useEffect(() => { if (iWon) setWon(true) }, [iWon])
