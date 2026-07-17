@@ -52,6 +52,28 @@ export async function fetchGame(gameId) {
   return data
 }
 
+/** A finished game, by code — the morning after.
+ *
+ * join_game deliberately refuses a finished game (`status <> 'finished'`), which
+ * is right: you can't take a seat at a game that's over. But it raises
+ * game_not_found, so last night's link told everyone "that code didn't match a
+ * game" and the night looked like it never happened.
+ *
+ * RLS decides who's allowed to look: games_select_visible is
+ * `is_public OR host_id = auth.uid() OR is_game_member(id)`, so the people who
+ * PLAYED can read it and a stranger with a guessed code still can't. Returns
+ * null when there's nothing readable, which is a real answer, not an error.
+ */
+export async function fetchFinishedGameByCode(code) {
+  const { data, error } = await supabase
+    .from('games').select('*')
+    .ilike('code', code).eq('status', 'finished')
+    .order('created_at', { ascending: false })
+    .limit(1)
+  if (error) return null
+  return data?.[0] ?? null
+}
+
 export async function fetchPlayerStates(gameId) {
   const { data, error } = await supabase.from('player_states').select('*').eq('game_id', gameId)
   if (error) throw error

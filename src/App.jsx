@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ensureSession, joinGame, fetchGame, fetchPlayerStates, storeCard,
+  ensureSession, joinGame, fetchGame, fetchFinishedGameByCode, fetchPlayerStates, storeCard,
   markSquare, claimBingo, subscribeGame, recordSnap, recordRepeat, uploadSnap, joinWaitlist,
 } from './lib/supabase'
 import { buildCard, hasBingo, squaresAway, FREE_INDEX } from './lib/bingo'
@@ -191,6 +191,22 @@ export default function App() {
       })
       setPhase('live')
     } catch (e) {
+      // The morning after. join_game refuses a finished game and raises
+      // game_not_found, so the link still sitting in the group chat told everyone
+      // last night never happened. If the game is simply OVER, show them the
+      // night: standings, the winning card, who came 2nd. RLS decides who's
+      // allowed to look, and returns nothing to a stranger with a guessed code —
+      // in which case we fall through to the honest error below.
+      if (/not_found|no rows|invalid/i.test(e?.message || '')) {
+        const done = await fetchFinishedGameByCode(code.trim().toUpperCase())
+        if (done) {
+          setGame(done)
+          seenWinners.current = new Set((done.winners || []).map((w) => (w.user_id || '').toLowerCase()))
+          setPlayers(await fetchPlayerStates(done.id).catch(() => []))
+          setPhase('live')   // `finished` renders GameOver, not the board
+          return
+        }
+      }
       setError(humanize(e))
     } finally { setBusy(false) }
   }
