@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ensureSession, joinGame, leaveGame, fetchGame, fetchFinishedGameByCode, fetchPlayerStates, storeCard,
   markSquare, claimBingo, subscribeGame, recordSnap, recordRepeat, uploadSnap, joinWaitlist,
+  fetchGameSnaps, signSnapUrls,
 } from './lib/supabase'
 import { buildCard, hasBingo, squaresAway, FREE_INDEX } from './lib/bingo'
 import { themeVars } from './lib/theme'
@@ -459,7 +460,7 @@ export default function App() {
       )}
 
       {finished ? (
-        <GameOver players={players} winners={winners} pattern={pattern} uid={uid} watching={game?.watching}
+        <GameOver gameId={game?.id} players={players} winners={winners} pattern={pattern} uid={uid} watching={game?.watching}
           onViewWinner={setViewWinner} />
       ) : !playing ? (
         <Lobby game={game} players={players} pattern={pattern} share={share} />
@@ -635,9 +636,28 @@ function WinnerCardSheet({ winner, tropes, onClose }) {
 /// The wrap-up screen — a finished game shows closing credits, not a fake lobby.
 /// Standings: most points first; a bingo is an award (🏆) and the tiebreak, not a
 /// throne. Winner rows with a card snapshot open the winning card.
-function GameOver({ players, winners, pattern, uid, watching, onViewWinner }) {
+function GameOver({ gameId, players, winners, pattern, uid, watching, onViewWinner }) {
   const key = (s) => (s || '').toLowerCase()
   const winRank = (id) => winners.findIndex((w) => key(w.user_id) === key(id))
+
+  // The night's album — every photo the room took, not just yours. It's the one
+  // thing a watch party makes that's worth keeping, and until now it evaporated:
+  // snaps went to the private bucket and nobody ever saw them again. RLS already
+  // lets a member read the whole game's snaps, so this needs no schema change.
+  const [snaps, setSnaps] = useState([])
+  const [lightbox, setLightbox] = useState(null)
+  useEffect(() => {
+    if (!gameId) return
+    let live = true
+    ;(async () => {
+      const rows = await fetchGameSnaps(gameId)
+      if (!rows.length) return
+      const urls = await signSnapUrls(rows.map((r) => r.path))
+      if (!live) return
+      setSnaps(rows.map((r) => ({ ...r, url: urls[r.path] })).filter((r) => r.url))
+    })()
+    return () => { live = false }
+  }, [gameId])
   const rows = players
     .map((p) => ({ p, win: winRank(p.user_id), score: p.score ?? 0, away: squaresAway(p.marked || [], pattern) }))
     .sort((a, b) => {
@@ -683,8 +703,35 @@ function GameOver({ players, winners, pattern, uid, watching, onViewWinner }) {
           )
         })}
       </div>
+
+      {snaps.length > 0 && (
+        <>
+          <div className="dim tiny" style={{ margin: '22px 0 8px' }}>📸 The night, {snaps.length} {snaps.length === 1 ? 'snap' : 'snaps'}</div>
+          <div className="snap-album">
+            {snaps.map((s) => (
+              <button className="snap-cell" key={s.id} onClick={() => setLightbox(s)}
+                aria-label={`Photo by ${s.name || 'someone'}${s.trope_text ? ` — ${s.trope_text}` : ''}`}>
+                <img src={s.url} alt="" loading="lazy" />
+                <span className="snap-cell__who">{s.name || 'Someone'}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
       <div className="spacer" />
       <div className="toast">🍿 Thanks for playing — see you at the next watch party.</div>
+
+      {lightbox && (
+        <div className="lightbox" onClick={() => setLightbox(null)}>
+          <img src={lightbox.url} alt="" onClick={(e) => e.stopPropagation()} />
+          <div className="lightbox__cap" onClick={(e) => e.stopPropagation()}>
+            {lightbox.trope_text && <b>{lightbox.trope_text}</b>}
+            <span className="dim"> · {lightbox.name || 'Someone'}</span>
+          </div>
+          <button className="lightbox__close" onClick={() => setLightbox(null)} aria-label="Close">✕</button>
+        </div>
+      )}
     </div>
   )
 }

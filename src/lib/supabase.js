@@ -131,6 +131,37 @@ export async function uploadSnap(gameId, userId, file, { squareIndex, tropeText,
   return path
 }
 
+/** Every snap taken during a game, newest first — the whole room's, not just
+ *  yours. No user filter: the night's album is everyone's photos.
+ *
+ *  Safe to widen because RLS was ALREADY game-scoped, not user-scoped — the
+ *  snaps SELECT policy is `is_game_member(game_id)`, and the storage read policy
+ *  gates on the same. So a member sees every snap in their game and a stranger
+ *  sees none; only the client query was ever narrowed to one user. Members-only
+ *  survives the wrap screen because is_game_member checks for a player_states
+ *  row, which end_game keeps. */
+export async function fetchGameSnaps(gameId) {
+  const { data, error } = await supabase
+    .from('snaps').select('*')
+    .eq('game_id', gameId)
+    .order('created_at', { ascending: false })
+  if (error) return []
+  return data ?? []
+}
+
+/** Batch-sign private snap paths for display. One round trip; a path that fails
+ *  to sign is dropped rather than shown broken. */
+export async function signSnapUrls(paths, expiresIn = 3600) {
+  if (!paths.length) return {}
+  const { data, error } = await supabase.storage.from('snaps').createSignedUrls(paths, expiresIn)
+  if (error) return {}
+  const byPath = {}
+  for (const row of data ?? []) {
+    if (row.signedUrl && !row.error) byPath[row.path] = row.signedUrl
+  }
+  return byPath
+}
+
 export async function leaveGame(gameId) {
   // rpc() builders are thenables without .catch — see ensureSession.
   try { await supabase.rpc('leave_game', { p_game_id: gameId }) } catch { /* best-effort */ }
