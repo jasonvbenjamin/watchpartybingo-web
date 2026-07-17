@@ -427,7 +427,7 @@ export default function App() {
         style={{ display: 'none' }} onChange={onSnapFile} />
 
       {sheet != null && (
-        <TileSheet trope={tropes[card[sheet]]} marked={marked.has(sheet)}
+        <TileSheet trope={tropes[card[sheet]]} marked={marked.has(sheet)} tapCount={taps[sheet] || 0}
           onClose={() => setSheet(null)}
           onDab={() => interact(sheet, 'dab')} onSnap={() => startSnap(sheet)} />
       )}
@@ -636,19 +636,31 @@ function Lobby({ game, players, pattern, share }) {
   )
 }
 
-function TileSheet({ trope, marked, onClose, onDab, onSnap }) {
+/// The square's sheet — where you learn what the trope means, then choose how to
+/// score it. Matches iOS SquareInteractionSheet beat for beat; keep them in step.
+///
+/// It used to be a full-width WHITE panel in a #08080C app — a flashbang in a dark
+/// room, thirty times a night, while the two sheets you open once a night were
+/// already dark. And it led with Snap, filled, above a ghosted Dab: a camera
+/// launch under the thumb of someone dabbing in the dark. Dab is ~9 taps in 10.
+function TileSheet({ trope, marked, tapCount = 0, onClose, onDab, onSnap }) {
+  // A snap pays 2 for the photo, plus 1 for the square only if it's new. It used
+  // to claim "+3 pt" always, which was wrong every time you snapped a square you
+  // already had. Mirrors the server: content + photos*2 + extra.
+  const snapPts = marked ? 2 : 3
   return (
     <div className="sheet-scrim" onClick={onClose}>
-      <div className="sheet" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-        <button className="close" onClick={onClose}>✕</button>
-        <div className="big-emoji">{trope?.emoji || '⭐'}</div>
+      <div className="sheet sheet-dark tile-sheet" onClick={(e) => e.stopPropagation()}>
+        <button className="close" onClick={onClose} aria-label="Close">✕</button>
+        <div className="tile-sheet__badge"><span>{trope?.emoji || '⭐'}</span></div>
         <h2>{trope?.text || 'Square'}</h2>
-        <p className="def">{trope?.description || 'Spot this on screen, then mark it.'}</p>
-        <button className="action action-snap" onClick={onSnap}>
-          <span>📸 Snap It</span><span className="pts">+3 pt</span>
+        <p className="def">{trope?.description || 'Spot it on screen, then dab it. Snap a photo of the room when it happens and it’s worth more.'}</p>
+        {tapCount > 1 && <div className="tile-sheet__count">Dabbed {tapCount}× so far</div>}
+        <button className="action action-dab" onClick={onDab}>
+          <span>{marked ? '✓ Dab again' : 'Dab it'}</span><span className="pts">+1</span>
         </button>
-        <button className={`action action-dab${marked ? ' done' : ''}`} onClick={onDab}>
-          <span>{marked ? '✓ Dab again' : 'Dab It'}</span><span className="pts">+1 pt</span>
+        <button className="action action-snap" onClick={onSnap}>
+          <span>📸 Snap it</span><span className="pts">+{snapPts}</span>
         </button>
       </div>
     </div>
