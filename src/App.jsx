@@ -445,11 +445,16 @@ function PlayersSheet({ players, pattern, uid, myMarked, hostId, winners, onClos
     (Array.isArray(winners[win]?.card) && winners[win].card.length === 25) ||
     (Array.isArray(p.card) && p.card.length === 25) ||
     key(p.user_id) === key(uid)
+  // Points decide the order — a bingo is an AWARD, not a throne. This header has
+  // said "Most points first" the whole time while the sort floated every winner
+  // above every non-winner, so a 5-point bingo outranked a 60-point grinder and
+  // repeats (which score, uncapped) could never move the top of the list. The 🏆
+  // still marks whoever bingoed; claim order is now only the tiebreak.
   const rows = players.map((p) => ({ p, away: awayOf(p), win: winRank(p.user_id), score: p.score ?? 0 }))
     .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score
       if ((a.win >= 0) !== (b.win >= 0)) return a.win >= 0 ? -1 : 1
       if (a.win >= 0 && b.win >= 0) return a.win - b.win
-      if (b.score !== a.score) return b.score - a.score
       return a.away - b.away
     })
   return (
@@ -535,20 +540,22 @@ function WinnerCardSheet({ winner, tropes, onClose }) {
 }
 
 /// The wrap-up screen — a finished game shows closing credits, not a fake lobby.
-/// Standings: bingo order first (claim order = rank), then points. Winner rows
-/// with a card snapshot open the winning card.
+/// Standings: most points first; a bingo is an award (🏆) and the tiebreak, not a
+/// throne. Winner rows with a card snapshot open the winning card.
 function GameOver({ players, winners, pattern, uid, watching, onViewWinner }) {
   const key = (s) => (s || '').toLowerCase()
   const winRank = (id) => winners.findIndex((w) => key(w.user_id) === key(id))
   const rows = players
     .map((p) => ({ p, win: winRank(p.user_id), score: p.score ?? 0, away: squaresAway(p.marked || [], pattern) }))
     .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score
       if ((a.win >= 0) !== (b.win >= 0)) return a.win >= 0 ? -1 : 1
       if (a.win >= 0 && b.win >= 0) return a.win - b.win
-      if (b.score !== a.score) return b.score - a.score
       return a.away - b.away
     })
-  const medal = (win, idx) => (win === 0 ? '🏆' : win === 1 ? '🥈' : win === 2 ? '🥉' : `${idx + 1}`)
+  // The rank column means ONE thing: your position on points, which is what the
+  // row order now is. The bingo is an award and rides on the right, so a trophy
+  // can't sit at position 4 pretending to be the rank.
   const ord = (n) => ['1st', '2nd', '3rd'][n] || `${n + 1}th`
   return (
     <div className="wrap">
@@ -571,14 +578,14 @@ function GameOver({ players, winners, pattern, uid, watching, onViewWinner }) {
             <div className="winner-row" key={p.id || p.user_id}
               style={hasCard ? { cursor: 'pointer' } : undefined}
               onClick={hasCard ? () => onViewWinner?.(entry) : undefined}>
-              <div className="rank">{medal(win, idx)}</div>
+              <div className="rank">{idx + 1}</div>
               <div className="avatar">{(p.name || '?')[0].toUpperCase()}</div>
               <div className="grow">
                 {p.name}
                 {key(p.user_id) === key(uid) && <span className="dim"> (you)</span>}
                 {hasCard && <span className="dim tiny"> · view card</span>}
               </div>
-              <div className="away">{win >= 0 ? `${ord(win)} · ${score} pts` : `${score} pts`}</div>
+              <div className="away">{win >= 0 ? `🏆 ${ord(win)} to bingo · ${score} pts` : `${score} pts`}</div>
             </div>
           )
         })}
