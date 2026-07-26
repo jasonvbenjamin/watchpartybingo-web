@@ -4,7 +4,7 @@ import {
   markSquare, claimBingo, subscribeGame, recordSnap, recordRepeat, uploadSnap, joinWaitlist,
   fetchGameSnaps, signSnapUrls,
 } from './lib/supabase'
-import { buildCard, hasBingo, squaresAway, FREE_INDEX } from './lib/bingo'
+import { buildCard, hasBingo, squaresAway, FREE_INDEX, WANT_CAP, effectiveAvoidCap } from './lib/bingo'
 import { themeVars } from './lib/theme'
 
 const NAME_KEY = 'wpb-player-name'
@@ -62,6 +62,16 @@ export default function App() {
   const [conn, setConn] = useState('CONNECTING')
 
   const [sheet, setSheet] = useState(null)            // tapped cell index
+  /// Card draft — YOUR move on the room's pool, same power as every other
+  /// player (and as iOS): up to 6 squares guaranteed on, up to 4 promised off.
+  /// Open from the lobby, or from the board until your first dab.
+  const [draftWant, setDraftWant] = useState([])
+  const [draftAvoid, setDraftAvoid] = useState([])
+  const [draftOpen, setDraftOpen] = useState(false)
+  /// Serializes card publishes and the first mark: the LAST toggle's deal must
+  /// reach the server last, and a dab must never race past a pending publish
+  /// (marks flip set_card into a no-op — the wrong card would get sealed).
+  const rpcChain = useRef(Promise.resolve())
   const [snaps, setSnaps] = useState([])              // local My Snaps gallery
   const fileRef = useRef(null)
   const pendingSnap = useRef(null)
@@ -102,6 +112,35 @@ export default function App() {
     .some((w) => (w.user_id || '').toLowerCase() === (uid || '').toLowerCase())
   const oneAway = playing && !iWon && !won && myAway === 1
   const me = players.find((p) => (p.user_id || '').toLowerCase() === (uid || '').toLowerCase())
+  /// The draft window: until your first dab (marked always holds FREE). Mirrors
+  /// the server — set_card only accepts a re-deal while `marked` is empty.
+  const canDraft = !game?.preview && !finished && marked.size <= 1
+
+  /// Toggle a draft pick and re-deal + re-publish the card on the spot. The
+  /// caps are shared with iOS; the avoid cap adapts to the pool so a benched
+  /// square is truly benched.
+  function toggleDraft(i, kind) {
+    if (!canDraft || !game) return
+    const inWant = draftWant.includes(i)
+    const inAvoid = draftAvoid.includes(i)
+    let w = draftWant.filter((x) => x !== i)
+    let a = draftAvoid.filter((x) => x !== i)
+    if (kind === 'want' && !inWant) {
+      if (draftWant.length >= WANT_CAP) return
+      w = [...w, i]
+    }
+    if (kind === 'avoid' && !inAvoid) {
+      if (draftAvoid.length >= effectiveAvoidCap(tropes.length)) return
+      a = [...a, i]
+    }
+    setDraftWant(w); setDraftAvoid(a)
+    try { localStorage.setItem(`wpb-draft-${game.id}`, JSON.stringify({ want: w, avoid: a })) } catch { /* ignore */ }
+    const c = buildCard(game.id, tropes.length, { want: w, avoid: a, fresh: true, seedKey: `${game.id}|${uid}` })
+    setCard(c)
+    // Re-publish in order; the server accepts it while un-marked (0016/0017).
+    rpcChain.current = rpcChain.current.then(() => storeCard(game.id, c)).catch(() => {})
+    buzz(14)
+  }
 
   /// The local score, DERIVED from the board with the server's own formula:
   ///   content squares (excl. FREE) + photos × 2 + extra taps
@@ -212,7 +251,14 @@ export default function App() {
       setGame(g)
       // Wins that happened before we joined aren't "news" — don't replay them.
       seenWinners.current = new Set((g.winners || []).map((w) => (w.user_id || '').toLowerCase()))
-      const myCard = ps.card?.length === 25 ? ps.card : buildCard(g.id, (g.custom_tropes || []).length || 25)
+      // Restore any persisted draft BEFORE dealing: the deal is deterministic
+      // per (game, player, draft), so a rejoin that has to re-generate produces
+      // the exact card that was drafted — and the sheet reads the truth.
+      let savedDraft = { want: [], avoid: [] }
+      try { savedDraft = { want: [], avoid: [], ...JSON.parse(localStorage.getItem(`wpb-draft-${g.id}`) || '{}') } } catch { /* ignore */ }
+      setDraftWant(savedDraft.want); setDraftAvoid(savedDraft.avoid)
+      const myCard = ps.card?.length === 25 ? ps.card : buildCard(g.id, (g.custom_tropes || []).length || 25,
+        { want: savedDraft.want, avoid: savedDraft.avoid, seedKey: `${g.id}|${id}` })
       setCard(myCard)
       storeCard(g.id, myCard) // publish once so others can peek from the leaderboard
       // Rejoining (a reload, a dropped tab) must restore the board we already
@@ -269,7 +315,9 @@ export default function App() {
   function persistMark(nextSet) {
     if (game?.preview) { if (!won && hasBingo(nextSet, pattern)) setWon(true); return }
     const arr = [...nextSet].filter((x) => x !== FREE_INDEX).sort((a, b) => a - b)
-    markSquare(game.id, arr).catch(() => {})
+    // Ride the same chain as card publishes: the first mark seals the card, so
+    // it must never overtake a draft re-publish that's still in flight.
+    rpcChain.current = rpcChain.current.then(() => markSquare(game.id, arr)).catch(() => {})
     if (!iWon && !won && hasBingo(nextSet, pattern)) doClaim()
   }
 
@@ -463,9 +511,16 @@ export default function App() {
         <GameOver gameId={game?.id} players={players} winners={winners} pattern={pattern} uid={uid} watching={game?.watching}
           onViewWinner={setViewWinner} />
       ) : !playing ? (
-        <Lobby game={game} players={players} pattern={pattern} share={share} />
+        <Lobby game={game} players={players} pattern={pattern} share={share}
+          canDraft={canDraft} draftWant={draftWant} draftAvoid={draftAvoid}
+          onOpenDraft={() => setDraftOpen(true)} />
       ) : (
         <div className="board-area">
+          {canDraft && (
+            <button className="draft-banner" onClick={() => setDraftOpen(true)}>
+              ✨ New card — make it yours before your first dab
+            </button>
+          )}
           {oneAway && <div className="oneaway">🔥 One square from bingo!</div>}
           <div className="bingo-head">{['B', 'I', 'N', 'G', 'O'].map((l) => <div key={l}>{l}</div>)}</div>
           <div className={`board${oneAway ? ' glow' : ''}`}>
@@ -508,6 +563,12 @@ export default function App() {
         <TileSheet trope={tropes[card[sheet]]} marked={marked.has(sheet)} tapCount={taps[sheet] || 0}
           onClose={() => setSheet(null)}
           onDab={() => interact(sheet, 'dab')} onSnap={() => startSnap(sheet)} />
+      )}
+
+      {draftOpen && (
+        <DraftSheet tropes={tropes} card={card} want={draftWant} avoid={draftAvoid} canDraft={canDraft}
+          wantCap={WANT_CAP} avoidCap={effectiveAvoidCap(tropes.length)}
+          onToggle={toggleDraft} onClose={() => setDraftOpen(false)} />
       )}
 
       {statsOpen && (
@@ -721,7 +782,8 @@ function GameOver({ gameId, players, winners, pattern, uid, watching, onViewWinn
   )
 }
 
-function Lobby({ game, players, pattern, share }) {
+function Lobby({ game, players, pattern, share, canDraft, draftWant = [], draftAvoid = [], onOpenDraft }) {
+  const hasDraft = draftWant.length > 0 || draftAvoid.length > 0
   return (
     <div className="wrap">
       <div className="code-card">
@@ -729,6 +791,20 @@ function Lobby({ game, players, pattern, share }) {
         <div className="code-big">{game?.code}</div>
         <button className="btn btn-brand" onClick={share}>Invite friends</button>
       </div>
+      {canDraft && (
+        <button className={`draft-row${hasDraft ? ' active' : ''}`} onClick={onOpenDraft}>
+          <span className="draft-row__icon">🃏</span>
+          <span className="draft-row__text">
+            <strong>Make your card yours</strong>
+            <span className="dim tiny">
+              {hasDraft
+                ? `${draftWant.length} picked · ${draftAvoid.length} benched`
+                : 'Pick a few squares you want, bench a few you don’t.'}
+            </span>
+          </span>
+          <span className="draft-row__chev">›</span>
+        </button>
+      )}
       <div style={{ height: 16 }} />
       <div className="dim tiny" style={{ marginBottom: 8 }}>Win pattern: {prettyPattern(pattern)} · {players.length} in the room</div>
       <div className="roster">
@@ -741,6 +817,86 @@ function Lobby({ game, players, pattern, share }) {
       </div>
       <div className="spacer" />
       <div className="toast">⏳ Waiting for the host to start… get comfy.</div>
+    </div>
+  )
+}
+
+/// Every player's "make it yours" moment — mirrors the iOS DraftCardSheet beat
+/// for beat: pick up to 6 squares you want on your card, bench up to 4 you never
+/// want to see. Each toggle re-deals and re-publishes YOUR card on the spot; the
+/// window closes at your first dab (same seal the server enforces).
+function DraftSheet({ tropes, card = [], want, avoid, canDraft, wantCap, avoidCap, onToggle, onClose }) {
+  return (
+    <div className="sheet-scrim" onClick={onClose}>
+      <div className="sheet sheet-dark draft-sheet" onClick={(e) => e.stopPropagation()}>
+        <button className="close" onClick={onClose}>✕</button>
+        <h2>{canDraft ? 'Make it yours' : 'Card sealed'}</h2>
+        {canDraft ? (
+          <>
+            <p className="def" style={{ textAlign: 'left', color: 'rgba(255,255,255,0.55)' }}>
+              Your card re-deals as you choose — it locks at your first dab.
+            </p>
+            {card.length === 25 && (
+              <div className="draft-preview" aria-label="Your current card">
+                {card.map((tIdx, i) => (
+                  <div key={i} className={`draft-preview__cell${i === FREE_INDEX ? ' free' : ''}${want.includes(tIdx) ? ' want' : ''}`}>
+                    {i === FREE_INDEX ? '★' : (tropes[tIdx]?.emoji || '·')}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="draft-group">
+              <div className="draft-group__head">
+                <div>
+                  <strong>Include</strong>
+                  <span className="dim tiny" style={{ display: 'block' }}>Always on your card</span>
+                </div>
+                <span className={`draft-cap${want.length >= wantCap ? ' full' : ''}`}>{want.length}/{wantCap}</span>
+              </div>
+              <div className="draft-chips">
+                {tropes.map((t, i) => (
+                  <button key={`w${i}`}
+                    className={`draft-chip${want.includes(i) ? ' on-want' : ''}`}
+                    disabled={!want.includes(i) && want.length >= wantCap}
+                    onClick={() => onToggle(i, 'want')}>
+                    {t.emoji} {t.text}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {avoidCap > 0 && (
+              <div className="draft-group">
+                <div className="draft-group__head">
+                  <div>
+                    <strong>Avoid</strong>
+                    <span className="dim tiny" style={{ display: 'block' }}>Kept off your card</span>
+                  </div>
+                  <span className={`draft-cap${avoid.length >= avoidCap ? ' full' : ''}`}>{avoid.length}/{avoidCap}</span>
+                </div>
+                <div className="draft-chips">
+                  {tropes.map((t, i) => (
+                    <button key={`a${i}`}
+                      className={`draft-chip${avoid.includes(i) ? ' on-avoid' : ''}`}
+                      disabled={!avoid.includes(i) && avoid.length >= avoidCap}
+                      onClick={() => onToggle(i, 'avoid')}>
+                      {t.emoji} {t.text}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button className="btn btn-brand" style={{ marginTop: 18 }} onClick={onClose}>Looks good</button>
+          </>
+        ) : (
+          <>
+            <div className="big-emoji">🔒</div>
+            <p className="def" style={{ color: 'rgba(255,255,255,0.55)' }}>
+              Your card is sealed — drafting closes at your first dab.
+            </p>
+            <button className="btn btn-dark" onClick={onClose}>Back to the game</button>
+          </>
+        )}
+      </div>
     </div>
   )
 }

@@ -52,26 +52,84 @@ export function squaresAway(marked, pattern) {
   }
 }
 
-function shuffle(arr) {
+/// Deterministic PRNG (mulberry32 over an FNV-1a hash of the seed string).
+/// The deal must be a pure function of (game, player, draft) — same as iOS —
+/// so a toggle-and-back restores your exact card and re-rolling the draft can
+/// never be farmed for a better layout.
+function seededRand(seedStr) {
+  let h = 0x811c9dc5
+  for (let i = 0; i < seedStr.length; i++) {
+    h ^= seedStr.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  let s = h >>> 0
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0
+    let t = Math.imul(s ^ (s >>> 15), 1 | s)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function shuffle(arr, rand = Math.random) {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor(rand() * (i + 1))
     ;[a[i], a[j]] = [a[j], a[i]]
   }
   return a
 }
 
-/** Build a 25-cell card: center is FREE (null); the other 24 are distinct trope
- *  indices into the game's custom_tropes. Persisted to localStorage per game so a
- *  reload keeps the same card. */
-export function buildCard(gameId, tropeCount) {
-  const key = `wpb-card-${gameId}`
-  try {
-    const saved = JSON.parse(localStorage.getItem(key) || 'null')
-    if (Array.isArray(saved) && saved.length === CARD_SIZE) return saved
-  } catch { /* ignore */ }
+// Draft caps — mirror iOS CardGenerator exactly: up to 6 squares guaranteed on,
+// up to 4 promised off, and the avoid cap shrinks when the pool barely covers a
+// card so a benched square is truly benched, never silently dealt back in.
+export const WANT_CAP = 6
+export const AVOID_CAP = 4
+export function effectiveAvoidCap(poolSize) {
+  return Math.max(0, Math.min(AVOID_CAP, poolSize - CONTENT_SQUARES))
+}
 
-  const picks = shuffle(Array.from({ length: tropeCount }, (_, i) => i)).slice(0, CONTENT_SQUARES)
+/** Build a 25-cell card: center is FREE (-1); the other 24 are distinct trope
+ *  indices into the game's custom_tropes. Persisted to localStorage per game so a
+ *  reload keeps the same card.
+ *
+ *  `want` indices are guaranteed on the card; `avoid` indices stay off it (the
+ *  cap math above makes the last-resort refill unreachable for capped callers).
+ *  Pass `fresh: true` on a draft change to re-deal past the cached card — the
+ *  cache then stores the new deal, so a reload keeps the drafted board.
+ *
+ *  `seedKey` (game + player) makes the deal DETERMINISTIC: the same draft always
+ *  produces the same card, so toggling a pick and toggling it back restores the
+ *  exact board — and re-dealing can't be farmed for a better layout. */
+export function buildCard(gameId, tropeCount, { want = [], avoid = [], fresh = false, seedKey = '' } = {}) {
+  const key = `wpb-card-${gameId}`
+  if (!fresh) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(key) || 'null')
+      if (Array.isArray(saved) && saved.length === CARD_SIZE) return saved
+    } catch { /* ignore */ }
+  }
+
+  const rand = seedKey
+    ? seededRand(`${seedKey}|w:${[...want].sort((a, b) => a - b)}|a:${[...avoid].sort((a, b) => a - b)}`)
+    : Math.random
+  const wantSet = new Set(want.filter((i) => i >= 0 && i < tropeCount))
+  const avoidSet = new Set(avoid.filter((i) => i >= 0 && i < tropeCount && !wantSet.has(i)))
+  const rest = shuffle(Array.from({ length: tropeCount }, (_, i) => i)
+    .filter((i) => !wantSet.has(i) && !avoidSet.has(i)), rand)
+  let picks = [...wantSet].sort((a, b) => a - b).slice(0, CONTENT_SQUARES)
+  picks = picks.concat(rest.slice(0, CONTENT_SQUARES - picks.length))
+  if (picks.length < CONTENT_SQUARES) {
+    // Pool minus avoids can't fill a card (uncapped caller) — refill from avoids
+    // rather than deal a broken board.
+    const chosen = new Set(picks)
+    picks = picks.concat(shuffle([...avoidSet].filter((i) => !chosen.has(i)), rand)
+      .slice(0, CONTENT_SQUARES - picks.length))
+  }
+  // A pool below 24 can't fill a card at all (unreachable through real create
+  // flows) — wrap rather than publish a card with holes in it.
+  while (picks.length < CONTENT_SQUARES && tropeCount > 0) picks.push(picks.length % tropeCount)
+  picks = shuffle(picks, rand) // placement
   const card = []
   let t = 0
   // FREE center is encoded as -1 (matches iOS CardGenerator + the old web card).

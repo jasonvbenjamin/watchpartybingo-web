@@ -273,3 +273,41 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 .lp-foot { text-align: center; color: var(--text-tertiary); padding: 18px 0 4px; font-size: 16px; }
 
 @media (prefers-reduced-motion: reduce) { .chip.dabbed { animation: none !important; } }
+
+/* Card draft — every player's "make it yours" moment (lobby + pre-first-dab).
+   Mirrors the iOS DraftCardSheet: Include chips go accent, Avoid chips go red,
+   the window seals at your first dab. */
+.draft-row { width: 100%; display: flex; align-items: center; gap: 12px; margin-top: 12px;
+  padding: 14px; border-radius: 18px; text-align: left; color: #fff;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--hairline); }
+.draft-row.active { border-color: var(--accent); }
+.draft-row__icon { font-size: 22px; }
+.draft-row__text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.draft-row__text strong { font-size: 15px; font-weight: 800; }
+.draft-row__chev { color: rgba(255,255,255,0.35); font-size: 20px; font-weight: 700; }
+
+.draft-banner { align-self: center; margin: 0 auto 10px; padding: 10px 18px; border-radius: 999px;
+  color: #fff; font-size: 13px; font-weight: 800; background: rgba(255,255,255,0.07);
+  border: 1px solid var(--accent); }
+
+.draft-sheet { max-height: 86vh; overflow-y: auto; text-align: left; }
+.draft-group { margin-top: 16px; }
+.draft-group__head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+.draft-group__head strong { font-size: 16px; font-weight: 800; }
+.draft-cap { font-size: 12px; font-weight: 800; color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums; }
+.draft-cap.full { color: var(--accent); }
+.draft-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.draft-chip { padding: 9px 13px; border-radius: 999px; font-size: 13.5px; font-weight: 700;
+  color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12); }
+.draft-chip:disabled { opacity: 0.35; }
+.draft-chip.on-want { background: #2e9e5b; border-color: rgba(255,255,255,0.4); color: #fff; }
+.draft-chip.on-avoid { background: #c0392b; border-color: rgba(255,255,255,0.4); color: #fff; }
+
+/* Live mini preview inside the draft sheet — the proof your picks change the
+   card. Wanted squares glow with the accent; FREE keeps its star. */
+.draft-preview { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 4px 0 14px; }
+.draft-preview__cell { aspect-ratio: 1; display: grid; place-items: center; font-size: 16px;
+  border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); }
+.draft-preview__cell.free { color: var(--accent); font-weight: 900; }
+.draft-preview__cell.want { border-color: #2e9e5b; background: rgba(46,158,91,0.18); }
