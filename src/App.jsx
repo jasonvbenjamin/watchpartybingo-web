@@ -415,9 +415,11 @@ export default function App() {
     if (!liveOnRef.current) return
     const who = pl?.name || 'Someone'
     const text = pl?.text || pl?.trope
-    const verb = pl?.kind === 'snap' ? 'snapped' : 'marked'
+    // Names only — never the square. Their board is theirs; the pulse is room
+    // liveness ("someone's playing"), not scoreboard espionage.
+    const verb = pl?.kind === 'snap' ? 'snapped' : 'dabbed'
     const id = ++pulseSeq.current
-    setPulses((p) => [...p.slice(-2), { id, msg: `${who} ${verb}${text ? ` ${text}` : ' a square'}` }])
+    setPulses((p) => [...p.slice(-2), { id, msg: `${who} ${verb}` }])
     setTimeout(() => setPulses((p) => p.filter((x) => x.id !== id)), 3200)
   }
 
@@ -522,6 +524,9 @@ export default function App() {
             </button>
           )}
           {oneAway && <div className="oneaway">🔥 One square from bingo!</div>}
+          <div className="pulse-slot" aria-live="polite">
+            {pulses.length > 0 && <div className="pulse-pill" key={pulses[pulses.length - 1].id}>{pulses[pulses.length - 1].msg}</div>}
+          </div>
           <div className="bingo-head">{['B', 'I', 'N', 'G', 'O'].map((l) => <div key={l}>{l}</div>)}</div>
           <div className={`board${oneAway ? ' glow' : ''}`}>
             {card.map((tIdx, i) => {
@@ -531,7 +536,7 @@ export default function App() {
               // Same thresholds as iOS TileView: badge above 1, hot at 3.
               const n = free ? 0 : (taps[i] || 0)
               return (
-                <button key={i} className={`cell${isMarked ? ' marked' : ''}${free ? ' free' : ''}${n >= 3 ? ' hot' : ''}`}
+                <button key={i} className={`cell${isMarked ? ' marked' : ''}${free ? ' free' : ''}`}
                   onClick={() => { if (!free && playing) setSheet(i) }}>
                   {n > 1 && <span className="badge">{n}×</span>}
                   {free ? <><span className="emoji">★</span><span className="label">FREE</span></>
@@ -550,11 +555,6 @@ export default function App() {
       </div>
       <div className="wordmark-foot">WatchPartyBingo</div>
 
-      {pulses.length > 0 && (
-        <div className="pulse-stack">
-          {pulses.map((p) => <div className="pulse-toast" key={p.id}>🟢 {p.msg}</div>)}
-        </div>
-      )}
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment"
         style={{ display: 'none' }} onChange={onSnapFile} />

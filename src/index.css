@@ -84,9 +84,10 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 
 /* Board */
 .board-area { padding: 10px 14px; }
-.bingo-head { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 6px; }
-.bingo-head div { height: 38px; border-radius: 10px; background: rgba(255,255,255,0.05);
-  display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 19px; color: rgba(255,255,255,0.85); }
+.bingo-head { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 4px; }
+/* A masthead, not a banner: short, tracked-out, faded — the grid is the star. */
+.bingo-head div { height: 16px; display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 12px; letter-spacing: 0.08em; color: rgba(255,255,255,0.32); }
 .board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .cell { aspect-ratio: 1; border-radius: 12px; background: rgba(255,255,255,0.92); border: 1px solid rgba(0,0,0,0.06);
   color: #1C1C24; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -100,11 +101,8 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 .cell.free .emoji { color: #f59e0b; }
 .cell.free .label { color: #b8730a; }
 .cell .badge { position: absolute; top: 3px; right: 5px; font-size: 9px; font-weight: 900; color: inherit; opacity: 0.85; }
-/* A square you keep dabbing is the joke of the night ("that's the FOURTH time
-   he's said it"). At 3+ it earns a ring — same threshold as the iOS tile, so
-   the two surfaces are the same game. Ring only: no glow to fight the room. */
-.cell.hot { box-shadow: 0 0 0 2px var(--brand-b), 0 0 10px rgba(248,52,255,0.35); }
-.cell.hot .badge { opacity: 1; }
+/* Repeat dabs: the badge counter tells the story on its own — the old 3+
+   "hot ring" added a second glow vocabulary that fought the winning line. */
 
 .footer-cta { display: flex; justify-content: center; padding: 14px; }
 .wordmark-foot { text-align: center; padding: 12px; color: #fff; font-weight: 800; opacity: 0.9; }
@@ -217,12 +215,13 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 @keyframes pulseGlow { 0%, 100% { opacity: .9; transform: scale(1); } 50% { opacity: 1; transform: scale(1.015); } }
 .board.glow { box-shadow: 0 0 0 2px var(--accent), 0 0 34px -6px var(--accent); border-radius: 14px; }
 
-/* Live activity pulses */
-.pulse-stack { position: fixed; left: 0; right: 0; bottom: calc(16px + env(safe-area-inset-bottom));
-  display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; z-index: 55; }
-.pulse-toast { background: rgba(20,20,28,0.92); color: #fff; border: 1px solid var(--hairline);
-  padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; animation: slideUp .2s ease; max-width: 90%; }
-@keyframes slideUp { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+/* Live activity pulse — "<name> dabbed", whispered: a faded centered pill in a
+   fixed-height slot above the board (the board never jumps), never the square. */
+.pulse-slot { height: 26px; display: grid; place-items: center; margin-bottom: 4px; pointer-events: none; }
+.pulse-pill { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.55); border: 1px solid var(--hairline);
+  padding: 4px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600; animation: fadeIn .25s ease; max-width: 90%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* Settings toggle */
 .toggle-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -233,7 +232,7 @@ h1 { font-size: 30px; font-weight: 800; margin: 2px 0; }
 .switch.on span { left: 21px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .cell.marked, .confetti span, .sheet, .oneaway, .pulse-toast { animation: none !important; }
+  .cell.marked, .confetti span, .sheet, .oneaway, .pulse-pill { animation: none !important; }
 }
 
 /* ---- Marketing landing page ---- */
